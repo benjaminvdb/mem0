@@ -24,7 +24,11 @@ from mem0.graphs.tools import (
     UPDATE_MEMORY_STRUCT_TOOL_GRAPH,
     UPDATE_MEMORY_TOOL_GRAPH,
 )
-from mem0.graphs.utils import EXTRACT_ENTITIES_PROMPT, get_update_memory_messages
+from mem0.graphs.utils import (
+    EXTRACT_ENTITIES_PROMPT,
+    get_update_memory_messages,
+    sanitize_graph_item,
+)
 from mem0.utils.factory import EmbedderFactory, LlmFactory
 
 logger = logging.getLogger(__name__)
@@ -107,7 +111,7 @@ class MemoryGraph:
                 NOOP_STRUCT_TOOL,
             ]
         elif self.llm_provider == "gemini":
-            # The `noop` ​​function n should be removed because it is unnecessary 
+            # The `noop` ​​function n should be removed because it is unnecessary
             # and causes the error: "should be non-empty for OBJECT type"
             _tools = [UPDATE_MEMORY_TOOL_GRAPH, ADD_MEMORY_TOOL_GRAPH]
 
@@ -122,10 +126,11 @@ class MemoryGraph:
             if item["name"] == "add_graph_memory":
                 to_be_added.append(item["arguments"])
             elif item["name"] == "update_graph_memory":
+                sanitized_item = sanitize_graph_item(item["arguments"])
                 self._update_relationship(
-                    item["arguments"]["source"],
-                    item["arguments"]["destination"],
-                    item["arguments"]["relationship"],
+                    sanitized_item["source"],
+                    sanitized_item["destination"],
+                    sanitized_item["relationship"],
                     filters,
                 )
             elif item["name"] == "noop":
@@ -134,11 +139,12 @@ class MemoryGraph:
         returned_entities = []
 
         for item in to_be_added:
-            source = item["source"].lower().replace(" ", "_")
-            source_type = item["source_type"].lower().replace(" ", "_")
-            relation = item["relationship"].lower().replace(" ", "_")
-            destination = item["destination"].lower().replace(" ", "_")
-            destination_type = item["destination_type"].lower().replace(" ", "_")
+            sanitized_item = sanitize_graph_item(item)
+            source = sanitized_item["source"]
+            source_type = sanitized_item["source_type"]
+            relation = sanitized_item["relationship"]
+            destination = sanitized_item["destination"]
+            destination_type = sanitized_item["destination_type"]
 
             returned_entities.append({"source": source, "relationship": relation, "target": destination})
 

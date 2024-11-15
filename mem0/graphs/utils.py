@@ -1,3 +1,5 @@
+import re
+
 UPDATE_GRAPH_PROMPT = """
 You are an AI expert specializing in graph memory management and optimization. Your task is to analyze existing graph memories alongside new information, and update the relationships in the memory list to ensure the most accurate, current, and coherent representation of knowledge.
 
@@ -29,29 +31,72 @@ Provide a list of update instructions, each specifying the source, target, and t
 """
 
 EXTRACT_ENTITIES_PROMPT = """
+You are an advanced algorithm designed to extract structured information from text to construct efficient and accurate knowledge graphs. Your primary goal is to **capture as much useful, explicitly stated information as possible**, while avoiding unnecessary or irrelevant details. Focus on clarity, precision, and practicality.
 
-You are an advanced algorithm designed to extract structured information from text to construct knowledge graphs. Your goal is to capture comprehensive information while maintaining accuracy. Follow these key principles:
+**Core Principles:**
+1. **Extract Explicit Information**: Include only information directly stated in the text. Avoid assumptions or inferred data.
+2. **Optimize Nodes and Relationships**: Identify key **entities** (nodes), assign appropriate **tags**, and define clear **relationships** between them using underscore-separated names.
+3. **Prioritize Reuse**: Reuse existing nodes and relationships whenever possible to prevent duplication and redundancy.
+4. **Focus on Key Targets**: Select main subjects and objects in the text as primary nodes and targets in relationships.
 
-1. Extract only explicitly stated information from the text.
-2. Identify nodes (entities/concepts), their types, and relationships.
-3. Use "USER_ID" as the source node for any self-references (I, me, my, etc.) in user messages.
-CUSTOM_PROMPT
+**Rules for Nodes:**
+- **Names and Types**: Use precise, widely recognized identifiers in English when possible. Retain native-language names for unique entities (e.g., "Phở").
+- **Tagging Conventions**: Assign concise, lowercase, underscore-separated tags to nodes (e.g., `person`, `place`, `concept`, `event`).
+- **Consistency**: Use the most complete and descriptive form of an entity throughout the graph.
 
-Nodes and Types:
-- Aim for simplicity and clarity in node representation.
-- Use basic, general types for node labels (e.g. "person" instead of "mathematician").
+**Rules for Relationships:**
+- **Clarity and Simplicity**: Use general, timeless, and descriptive relationship names (e.g., `also_known_as`, `likes`, `originates_from`).
+- **Consistent Naming**: Relationships must be lowercase, concise, and use underscores (e.g., `acquainted_with`, `is_part_of`).
+- **Avoid Overcomplication**: Keep relationships straightforward and directly related to the text.
 
-Relationships:
-- Use consistent, general, and timeless relationship types.
-- Example: Prefer "PROFESSOR" over "BECAME_PROFESSOR".
+**Examples:**
 
-Entity Consistency:
-- Use the most complete identifier for entities mentioned multiple times.
-- Example: Always use "John Doe" instead of variations like "Joe" or pronouns.
+**Example 1**
+**Input**:
+"B-2 Spirit also known as Stealth Bomber."
+**Extracted Relationships**:
+```json
+[
+  {
+    "source": "B-2 Spirit",
+    "relationship": "also_known_as",
+    "target": "Stealth Bomber"
+  }
+]
+```
+**Node Tags**:
+- "B-2 Spirit" (tag: `fighter_aircraft`)
+- "Stealth Bomber" (tag: `strategic_bomber`)
 
-Strive for a coherent, easily understandable knowledge graph by maintaining consistency in entity references and relationship types.
+**Example 2**
+**Input**:
+"Tôi thích ăn Phở vì nó đặc trưng hương vị của đồ ăn Việt Nam."
+**Extracted Relationships**:
 
-Adhere strictly to these guidelines to ensure high-quality knowledge graph extraction."""
+```json
+[
+  {
+    "source": "USER_ID",
+    "relationship": "likes",
+    "target": "Phở"
+  },
+  {
+    "source": "Phở",
+    "relationship": "originates_from",
+    "target": "Vietnam"
+  }
+]
+```
+
+**Key Practices:**
+- **Maximize Useful Content**: Extract all significant information that contributes to understanding the text's meaning.
+- **Avoid Overuse and Off-topic Details**: Do not include irrelevant or speculative data.
+- **Simplify for Reuse**: Design nodes and relationships for seamless integration with existing data.
+- **Clarity and Coherence**: Ensure the knowledge graph is easy to understand and logically connected.
+- **Consistency in Naming**: Use standard, widely accepted terms to enhance reusability.
+
+Adhere strictly to these guidelines to construct knowledge graphs that are **efficient, accurate, and practically useful**, capturing the richness of the input text without unnecessary complexity.
+"""
 
 
 def get_update_memory_prompt(existing_memories, memory, template):
@@ -65,3 +110,25 @@ def get_update_memory_messages(existing_memories, memory):
             "content": get_update_memory_prompt(existing_memories, memory, UPDATE_GRAPH_PROMPT),
         },
     ]
+
+def sanitize_graph_item(item):
+    def transform(value):
+        # return value.lower().replace(" ", "_") if value else value
+        return convert_unicode_escapes(value)
+
+    keys = ["source", "source_type", "relationship", "destination", "destination_type"]
+    return {key: transform(item[key]) for key in keys if key in item}
+
+
+def convert_unicode_escapes(content):
+    # Pattern to match Unicode escape sequences like "\u00XX"
+    pattern = r"\\u[0-9a-fA-F]{4}"
+
+    # Function to replace each match with its corresponding UTF-8 character
+    def replace_match(match):
+        unicode_escape = match.group(0)
+        # Convert the Unicode escape to a character
+        return unicode_escape.encode().decode("unicode_escape")
+
+    # Replace all Unicode escape sequences in the input string
+    return re.sub(pattern, replace_match, content)

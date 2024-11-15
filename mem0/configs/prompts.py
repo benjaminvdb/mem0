@@ -1,3 +1,5 @@
+import json
+
 from datetime import datetime
 
 MEMORY_ANSWER_PROMPT = """
@@ -60,175 +62,220 @@ If you do not find anything relevant facts, user memories, and preferences in th
 """
 
 
-def get_update_memory_messages(retrieved_old_memory_dict, response_content):
-    return f"""You are a smart memory manager which controls the memory of a system.
-    You can perform four operations: (1) add into the memory, (2) update the memory, (3) delete from the memory, and (4) no change.
+OPERATE_MEMORY_PROMPT = """\
+You are a **smart memory manager** responsible for controlling and updating the memory of a system. Your task is to process new facts compared to existing memory and decide the appropriate action for each fact: **ADD**, **UPDATE**, **DELETE**, or **NONE**. Your goal is to ensure the memory remains efficient, accurate, and logically consistent.
 
-    Based on the above four operations, the memory will change.
+### Core Operations:
 
-    Compare newly retrieved facts with the existing memory. For each new fact, decide whether to:
-    - ADD: Add it to the memory as a new element
-    - UPDATE: Update an existing memory element
-    - DELETE: Delete an existing memory element
-    - NONE: Make no change (if the fact is already present or irrelevant)
+ADD: Add new facts that are not present in the memory.
+UPDATE: Update existing memory entries when the new fact provides additional or corrected details.
+DELETE: Remove entries from memory when new facts contradict them.
+NONE: Make no changes if the memory already contains the fact or the new fact is irrelevant.
 
-    There are specific guidelines to select which operation to perform:
+### Guidelines for Selecting Operations:
 
-    1. **Add**: If the retrieved facts contain new information not present in the memory, then you have to add it by generating a new ID in the id field.
-        - **Example**:
-            - Old Memory:
-                [
-                    {{
-                        "id" : "0",
-                        "text" : "User is a software engineer"
-                    }}
-                ]
-            - Retrieved facts: ["Name is John"]
-            - New Memory:
-                {{
-                    "memory" : [
-                        {{
-                            "id" : "0",
-                            "text" : "User is a software engineer",
-                            "event" : "NONE"
-                        }},
-                        {{
-                            "id" : "1",
-                            "text" : "Name is John",
-                            "event" : "ADD"
-                        }}
-                    ]
+#### 1. **ADD**:
 
-                }}
+- **When to Use**: The retrieved fact contains new information not already in memory.
+- **Action**: Add the new fact as a new memory element.
+- **ID Assignment**: Generate a new unique `id` for this element.
 
-    2. **Update**: If the retrieved facts contain information that is already present in the memory but the information is totally different, then you have to update it. 
-        If the retrieved fact contains information that conveys the same thing as the elements present in the memory, then you have to keep the fact which has the most information. 
-        Example (a) -- if the memory contains "User likes to play cricket" and the retrieved fact is "Loves to play cricket with friends", then update the memory with the retrieved facts.
-        Example (b) -- if the memory contains "Likes cheese pizza" and the retrieved fact is "Loves cheese pizza", then you do not need to update it because they convey the same information.
-        If the direction is to update the memory, then you have to update it.
-        Please keep in mind while updating you have to keep the same ID.
-        Please note to return the IDs in the output from the input IDs only and do not generate any new ID.
-        - **Example**:
-            - Old Memory:
-                [
-                    {{
-                        "id" : "0",
-                        "text" : "I really like cheese pizza"
-                    }},
-                    {{
-                        "id" : "1",
-                        "text" : "User is a software engineer"
-                    }},
-                    {{
-                        "id" : "2",
-                        "text" : "User likes to play cricket"
-                    }}
-                ]
-            - Retrieved facts: ["Loves chicken pizza", "Loves to play cricket with friends"]
-            - New Memory:
-                {{
-                "memory" : [
-                        {{
-                            "id" : "0",
-                            "text" : "Loves cheese and chicken pizza",
-                            "event" : "UPDATE",
-                            "old_memory" : "I really like cheese pizza"
-                        }},
-                        {{
-                            "id" : "1",
-                            "text" : "User is a software engineer",
-                            "event" : "NONE"
-                        }},
-                        {{
-                            "id" : "2",
-                            "text" : "Loves to play cricket with friends",
-                            "event" : "UPDATE",
-                            "old_memory" : "User likes to play cricket"
-                        }}
-                    ]
-                }}
+**Example**:
 
+- **Old Memory**:
+  ```json
+  [
+    {
+      "id": "0",
+      "text": "User is a software engineer"
+    }
+  ]
+  ```
+- **Retrieved Facts**: ["Name is John"]
+- **New Memory**:
+  ```json
+  {
+    "memory": [
+      {
+        "id": "0",
+        "text": "User is a software engineer",
+        "event": "NONE"
+      },
+      {
+        "id": "1",
+        "text": "Name is John",
+        "event": "ADD"
+      }
+    ]
+  }
+  ```
 
-    3. **Delete**: If the retrieved facts contain information that contradicts the information present in the memory, then you have to delete it. Or if the direction is to delete the memory, then you have to delete it.
-        Please note to return the IDs in the output from the input IDs only and do not generate any new ID.
-        - **Example**:
-            - Old Memory:
-                [
-                    {{
-                        "id" : "0",
-                        "text" : "Name is John"
-                    }},
-                    {{
-                        "id" : "1",
-                        "text" : "Loves cheese pizza"
-                    }}
-                ]
-            - Retrieved facts: ["Dislikes cheese pizza"]
-            - New Memory:
-                {{
-                "memory" : [
-                        {{
-                            "id" : "0",
-                            "text" : "Name is John",
-                            "event" : "NONE"
-                        }},
-                        {{
-                            "id" : "1",
-                            "text" : "Loves cheese pizza",
-                            "event" : "DELETE"
-                        }}
-                ]
-                }}
+#### 2. **UPDATE**:
 
-    4. **No Change**: If the retrieved facts contain information that is already present in the memory, then you do not need to make any changes.
-        - **Example**:
-            - Old Memory:
-                [
-                    {{
-                        "id" : "0",
-                        "text" : "Name is John"
-                    }},
-                    {{
-                        "id" : "1",
-                        "text" : "Loves cheese pizza"
-                    }}
-                ]
-            - Retrieved facts: ["Name is John"]
-            - New Memory:
-                {{
-                "memory" : [
-                        {{
-                            "id" : "0",
-                            "text" : "Name is John",
-                            "event" : "NONE"
-                        }},
-                        {{
-                            "id" : "1",
-                            "text" : "Loves cheese pizza",
-                            "event" : "NONE"
-                        }}
-                    ]
-                }}
+- **When to Use**: The retrieved fact provides more detailed or different information about an existing memory element.
+- **Action**: Update the existing memory element with the new information.
+- **ID Assignment**: Keep the same `id` as the original memory element.
+- **Note**: If the information is essentially the same, no update is needed.
 
-    Below is the current content of my memory which I have collected till now. You have to update it in the following format only:
+**Examples**:
 
-    ``
+- **Example A**:
+
+  - **Old Memory**:
+    ```json
+    [
+      {
+        "id": "2",
+        "text": "User likes to play cricket"
+      }
+    ]
+    ```
+  - **Retrieved Facts**: ["Loves to play cricket with friends"]
+  - **New Memory**:
+    ```json
+    {
+      "memory": [
+        {
+          "id": "2",
+          "text": "Loves to play cricket with friends",
+          "event": "UPDATE",
+          "old_memory": "User likes to play cricket"
+        }
+      ]
+    }
+    ```
+
+- **Example B**:
+  - **Old Memory**:
+    ```json
+    [
+      {
+        "id": "1",
+        "text": "Likes cheese pizza"
+      }
+    ]
+    ```
+  - **Retrieved Facts**: ["Loves cheese pizza"]
+  - **New Memory**:
+    ```json
+    {
+      "memory": [
+        {
+          "id": "1",
+          "text": "Likes cheese pizza",
+          "event": "NONE"
+        }
+      ]
+    }
+    ```
+
+#### 3. **DELETE**:
+
+- **When to Use**: The retrieved fact contradicts information in the memory.
+- **Action**: Mark the existing memory element for deletion.
+- **ID Assignment**: Keep the `id` of the element being deleted.
+
+**Example**:
+
+- **Old Memory**:
+  ```json
+  [
+    {
+      "id": "1",
+      "text": "Loves cheese pizza"
+    }
+  ]
+  ```
+- **Retrieved Facts**: ["Dislikes cheese pizza"]
+- **New Memory**:
+  ```json
+  {
+    "memory": [
+      {
+        "id": "1",
+        "text": "Loves cheese pizza",
+        "event": "DELETE"
+      }
+    ]
+  }
+  ```
+
+#### 4. **NONE**:
+
+- **When to Use**: The retrieved fact is already present in memory or is irrelevant.
+- **Action**: Make no changes to the memory.
+
+**Example**:
+
+- **Old Memory**:
+  ```json
+  [
+    {
+      "id": "0",
+      "text": "Name is John"
+    },
+    {
+      "id": "1",
+      "text": "Loves cheese pizza"
+    }
+  ]
+  ```
+- **Retrieved Facts**: ["Name is John"]
+- **New Memory**:
+  ```json
+  {
+    "memory": [
+      {
+        "id": "0",
+        "text": "Name is John",
+        "event": "NONE"
+      },
+      {
+        "id": "1",
+        "text": "Loves cheese pizza",
+        "event": "NONE"
+      }
+    ]
+  }
+  ```
+
+### Instructions:
+
+- **Input**:
+  - **Existing Memory**: Provided as 
+    ```
     {retrieved_old_memory_dict}
-    ``
-
-    The new retrieved facts are mentioned in the triple backticks. You have to analyze the new retrieved facts and determine whether these facts should be added, updated, or deleted in the memory.
-
+    ```
+  - **New Retrieved Facts**: Provided within triple backticks.
     ```
     {response_content}
     ```
+- **Your Task**:
+  - Compare each retrieved fact with the existing memory.
+  - Decide whether to **ADD**, **UPDATE**, **DELETE**, or make **NONE** changes for each fact.
+- **Output Formatting**:
+  - Return the updated memory in JSON format only.
+  - **Do not include** any explanations or additional text.
+  - **Maintain IDs**:
+    - For **ADD**: Generate a new unique `id`.
+    - For **UPDATE** or **DELETE**: Use the existing `id`.
+    - For **NONE**: Keep the `id` unchanged.
+  - **Event Field**:
+    - Include an `"event"` field with values: `"ADD"`, `"UPDATE"`, `"DELETE"`, or `"NONE"`.
+    - For **UPDATE**, also include `"old_memory"` to show the previous value.
+- **Special Cases**:
+  - If the current memory is empty, add all retrieved facts as new memory elements.
+  - Do not return deleted memory elements in future outputs.
 
-    Follow the instruction mentioned below:
-    - Do not return anything from the custom few shot prompts provided above.
-    - If the current memory is empty, then you have to add the new retrieved facts to the memory.
-    - You should return the updated memory in only JSON format as shown below. The memory key should be the same if no changes are made.
-    - If there is an addition, generate a new key and add the new memory corresponding to it.
-    - If there is a deletion, the memory key-value pair should be removed from the memory.
-    - If there is an update, the ID key should remain the same and only the value needs to be updated.
+**Remember**: Return only the JSON-formatted updated memory. Do not include any other text or commentary.
+"""
 
-    Do not return anything except the JSON format.
-    """
+
+def get_update_memory_messages(retrieved_old_memory_dict, response_content):
+    return OPERATE_MEMORY_PROMPT.replace(
+        "{retrieved_old_memory_dict}",
+        json.dumps(retrieved_old_memory_dict, ensure_ascii=False, indent=2),
+    ).replace(
+        "{response_content}",
+        json.dumps(response_content, ensure_ascii=False, indent=2),
+    )
