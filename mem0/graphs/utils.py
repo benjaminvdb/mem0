@@ -108,16 +108,16 @@ Example:
 **Existing Graph Memories**:  
 ```json
 [
-  {
+  {{
     "source": "lh0x00",
     "target": "Lâm Hiếu",
     "relationship": "has_name"
-  },
-  {
+  }},
+  {{
     "source": "lh0x00",
     "target": "Sendo",
     "relationship": "works_at"
-  }
+  }}
 ]
 ```
 
@@ -183,16 +183,23 @@ EXTRACT_ENTITIES_PROMPT = f"""\
    - Use **USER_ID** as the **source** when the input refers to the user explicitly or implicitly (e.g., through pronouns like "I," "me," or "my").  
    - For other relationships, dynamically determine the **source** based on the logical subject of the action or description. The **target** should represent the object or complement of the relationship.
 
-2. **Explicit Data Only**:  
+2. **English-Only Output**:  
+   - All outputs, including nodes, relationships, and tags, must be presented in **English**.  
+   - Proper names, widely used terms, or culturally specific keywords may retain their original language if no equivalent exists in English.  
+
+   Examples:  
+   - Use "User" instead of "Người dùng" or "nguoi dung."  
+   - For job titles, translate unless they are proper nouns (e.g., "Software Engineer" instead of "Kỹ sư phần mềm").
+   - Retain names like "Elon Musk" or specific terms like "Tesla."
+   - Don't overuse capitalization if it's not necessary (e.g., "friendly dog" instead of "Friendly Dog" or "Friendly dog").
+
+3. **Explicit Data Only**:  
    - Extract only information explicitly stated in the input text. Avoid assumptions, inferences, or fabrications.  
    - Focus on actionable and relevant data.
 
-3. **Clarity and Simplicity**:  
+4. **Clarity and Simplicity**:  
    - Ensure relationships are straightforward and logical, avoiding redundancy or unnecessary complexity.  
    - Use simple, standardized naming for nodes and relationships.
-
-4. **Language Consistency**:  
-   - All extracted data, including nodes, relationships, and tags, must be presented in **English**, regardless of the input language.
 
 5. **Time Awareness**:  
    - Accurately capture time-related details, interpreting relative terms like "yesterday" or "next year" using today’s date as `{datetime.now().strftime('%Y-%m-%d')}`.
@@ -201,10 +208,10 @@ EXTRACT_ENTITIES_PROMPT = f"""\
 
 1. **Clear and Recognizable Names**:  
    - Use unambiguous and widely recognized identifiers for nodes.  
-   - Retain native-language names only for culturally specific entities when necessary.
+   - Retain native-language names only for culturally specific entities or when no English equivalent is available.
 
 2. **Standardized Tags**:  
-   - Categorize nodes using lowercase, underscore-separated tags (e.g., `person`, `organization`, `event`, `time`, `job_title`).
+   - Categorize nodes using lowercase, underscore-separated tags (e.g., `person`, `organization`, `event`, `time`, `job_title`).  
 
 3. **Avoid Redundancy**:  
    - Ensure each node represents a unique entity, consolidating duplicate references.
@@ -220,7 +227,7 @@ EXTRACT_ENTITIES_PROMPT = f"""\
    - The **target** should represent the object, complement, or entity affected by the action or description.
 
 3. **Standardized Naming**:  
-   - Use lowercase, underscore-separated terms for relationships (e.g., `works_at`, `studied_at`, `is_known_as`).
+   - Use lowercase, underscore-separated terms for relationships (e.g., `works_at`, `studied_at`, `is_known_as`).  
 
 4. **USER_ID as Priority**:  
    - When **USER_ID** is mentioned, prioritize it as the **source** for all relevant relationships.  
@@ -235,20 +242,21 @@ EXTRACT_ENTITIES_PROMPT = f"""\
    - Dynamically identify the **source** based on the subject of the segment. Assign the **target** based on the complement or object of the relationship.
 
 3. **Standardize and Validate**:  
-   - Ensure all relationships follow standardized naming conventions and maintain logical directionality.
+   - Ensure all relationships follow standardized naming conventions and maintain logical directionality.  
+   - Validate that all outputs adhere strictly to English for nodes, relationships, and tags.
 
 4. **Refinement and Review**:  
    - Validate extracted data for accuracy, clarity, and compliance with English-only output requirements.
 
 **Generalized Guidance for Outputs**
 
-- When multiple ideas are present, extract each relationship independently. Ensure logical connections and avoid overlap or ambiguity.
-- For user-referential input (e.g., "I graduated from MIT in 2020"), use **USER_ID** as the **source**.
-- For third-party statements, dynamically determine the **source** based on the subject of the statement.
+- When multiple ideas are present, extract each relationship independently. Ensure logical connections and avoid overlap or ambiguity.  
+- For user-referential input (e.g., "I graduated from MIT in 2020"), use **USER_ID** as the **source**.  
+- For third-party statements, dynamically determine the **source** based on the subject of the statement.  
 
 **Examples of Logical Behavior**
 
-**Input 1 (USER_ID-centric)**:
+**Input 1 (USER_ID-centric)**:  
 "I work as a Principal Engineer at Google and graduated from Stanford in 2015."  
 **Output**:  
 ```json
@@ -276,8 +284,8 @@ EXTRACT_ENTITIES_PROMPT = f"""\
 ]
 ```
 
-**Input 2 (Third-party relationships)**:
-"Tesla was founded by Elon Musk and started in 2003."  
+**Input 2 (Third-party relationships)**:  
+"Tesla được Elon Musk thành lập và đi vào hoạt động vào năm 2003."  
 **Output**:  
 ```json
 [
@@ -294,8 +302,8 @@ EXTRACT_ENTITIES_PROMPT = f"""\
 ]
 ```
 
-**Input 3 (Mixed and Complex Ideas)**:
-"My name's Lâm Hiếu, also known as Hiểu Lầm, enjoys hiking. I currently works at Sendo as a Principal Engineer."  
+**Input 3 (Mixed, Complex Ideas and Other Languages)**:  
+"Tôi tên là Lâm Hiếu, còn được gọi là Hiểu Lầm, thích đi bộ đường dài. Hiện tại tôi đang làm việc tại Sendo với vai trò là Kỹ sư chính."  
 **Output**:  
 ```json
 [
@@ -326,11 +334,18 @@ EXTRACT_ENTITIES_PROMPT = f"""\
   }}
 ]
 ```
+
+This ensures that **English compliance** is maintained across outputs, prioritizing clarity, accuracy, and consistency.
 """
 
 
 def get_update_memory_prompt(existing_memories, memory, template):
-    return template.format(existing_memories=existing_memories if isinstance(existing_memories, list) else "[]", memory=memory)
+    return template.format(
+        existing_memories=(
+            existing_memories if isinstance(existing_memories, list) else "[]"
+        ),
+        memory=memory,
+    )
 
 
 def get_update_memory_messages(existing_memories, memory):

@@ -36,6 +36,8 @@ from mem0.graphs.utils import (
 )
 from mem0.utils.factory import EmbedderFactory, LlmFactory
 
+from .utils import remove_code_blocks
+
 logger = logging.getLogger(__name__)
 
 
@@ -98,23 +100,28 @@ class MemoryGraph:
         if self.llm_provider in ["azure_openai_structured", "openai_structured"]:
             _tools = [ADD_MESSAGE_STRUCT_TOOL]
 
+        logger.debug("The extracted entities messages are: %s", messages)
         extracted_entities = self.llm.generate_response(
             messages=messages,
             tools=_tools,
         )
+        logger.debug("The extracted entities response is: %s", extracted_entities)
 
         if extracted_entities["tool_calls"]:
             extracted_entities = extracted_entities["tool_calls"][0]["arguments"][
                 "entities"
             ]
+        elif extracted_entities["content"]:
+            try:
+                extracted_entities = remove_code_blocks(extracted_entities["content"])
+                extracted_entities = json.loads(extracted_entities)
+            except Exception as e:
+                logger.error("Error in extracting entities: %s", e)
+                extracted_entities = []
         else:
             extracted_entities = []
 
-        print(
-            "extracted_entitiesextracted_entities",
-            json.dumps(extracted_entities, ensure_ascii=False, indent=2),
-        )
-        logger.debug(f"Extracted entities: {extracted_entities}")
+        logger.debug(f"The extracted entities are: %s", extracted_entities)
         search_output_string = format_entities(search_output)
         update_memory_prompt = get_update_memory_messages(
             search_output_string, extracted_entities
