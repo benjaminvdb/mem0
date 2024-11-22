@@ -185,10 +185,10 @@ class MemoryGraph:
 
             # Updated Cypher query to include node types and embeddings
             cypher = f"""
-            MERGE (n:{source_type} {{name: $source_name, user_id: $user_id}})
+            MERGE (n:`{source_type}` {{name: $source_name, user_id: $user_id}})
             ON CREATE SET n.created = timestamp(), n.embedding = $source_embedding
             ON MATCH SET n.embedding = $source_embedding
-            MERGE (m:{destination_type} {{name: $dest_name, user_id: $user_id}})
+            MERGE (m:`{destination_type}` {{name: $dest_name, user_id: $user_id}})
             ON CREATE SET m.created = timestamp(), m.embedding = $dest_embedding
             ON MATCH SET m.embedding = $dest_embedding
             MERGE (n)-[rel:{relation}]->(m)

@@ -175,7 +175,7 @@ UPDATE_GRAPH_USER_PROMPT = """\
 """
 
 EXTRACT_ENTITIES_PROMPT = f"""\
-**You are a system designed for advanced text analysis and structured knowledge extraction**, tasked with creating **accurate and reusable knowledge graphs**. Your primary goal is to extract meaningful, explicitly stated relationships and entities from input text, dynamically identifying the appropriate **source** and **target** for each relationship. When **USER_ID** is mentioned, prioritize it as the central **source**. Otherwise, determine the **source** based on the logical subject of each relationship.
+You are a system designed for advanced text analysis and structured knowledge extraction, tasked with creating **accurate and reusable knowledge graphs**. Your primary goal is to extract meaningful, explicitly stated relationships and entities from input text, dynamically identifying the appropriate **source** and **target** for each relationship. When **USER_ID** is mentioned, prioritize it as the central **source**. Otherwise, determine the **source** based on the logical subject of each relationship.
 
 **Core Principles**
 
@@ -183,44 +183,45 @@ EXTRACT_ENTITIES_PROMPT = f"""\
    - Use **USER_ID** as the **source** when the input refers to the user explicitly or implicitly (e.g., through pronouns like "I," "me," or "my").  
    - For other relationships, dynamically determine the **source** based on the logical subject of the action or description. The **target** should represent the object or complement of the relationship.
 
-2. **Explicit Data Only**:  
+2. **English-Only Output**:  
+   - All extracted data, including nodes, relationships, and tags, must be presented in **English**, regardless of the input language.  
+   - Exceptions are proper names (e.g., people, places, organizations) or widely recognized terms.
+
+3. **Standardized Node and Relationship Formatting**:  
+   - Nodes (source and target) should be written in **lowercase**, except for proper nouns or formal names, which must be **capitalized appropriately** (e.g., “Elon Musk,” “Tesla,” “engineer”).  
+   - Relationships and tags must be in lowercase, using **underscore-separated terms** (e.g., `works_at`, `founded_by`, `known_as`).
+
+4. **Explicit Data Only**:  
    - Extract only information explicitly stated in the input text. Avoid assumptions, inferences, or fabrications.  
    - Focus on actionable and relevant data.
 
-3. **Clarity and Simplicity**:  
+5. **Clarity and Simplicity**:  
    - Ensure relationships are straightforward and logical, avoiding redundancy or unnecessary complexity.  
-   - Use simple, standardized naming for nodes and relationships.
+   - Use concise and standardized naming for nodes and relationships.
 
-4. **Language Consistency**:  
-   - All extracted data, including nodes, relationships, and tags, must be presented in **English**, regardless of the input language.
-
-5. **Time Awareness**:  
+6. **Time Awareness**:  
    - Accurately capture time-related details, interpreting relative terms like "yesterday" or "next year" using today’s date as `{datetime.now().strftime('%Y-%m-%d')}`.
 
 **Node Guidelines**
 
 1. **Clear and Recognizable Names**:  
-   - Use unambiguous and widely recognized identifiers for nodes.  
-   - Retain native-language names only for culturally specific entities when necessary.
+   - Nodes should use clear and unambiguous names, formatted in **lowercase** (not underscore), except for proper names.
+   - Avoid duplicate or redundant nodes.
 
-2. **Standardized Tags**:  
-   - Categorize nodes using lowercase, underscore-separated tags (e.g., `person`, `organization`, `event`, `time`, `job_title`).
-
-3. **Avoid Redundancy**:  
-   - Ensure each node represents a unique entity, consolidating duplicate references.
+2. **Consistency in Tags/Types**:  
+   - Categorize nodes using lowercase, underscore-separated tags (e.g., `person`, `organization`, `event`, `time`, `consciousness`, `conflict`, `function`, `concept`, `theory`, `culture`, `technology`, `virtual_assistant`).
 
 **Relationship Guidelines**
 
-1. **Relevant and Meaningful**:  
-   - Extract only relationships that provide valuable, actionable connections.  
-   - Avoid speculative or overly detailed relationships that dilute clarity.
+1. **Meaningful and Relevant**:  
+   - Extract only relationships that provide valuable, actionable connections. Avoid speculative or overly detailed relationships.
 
 2. **Correct Directionality**:  
    - Assign the **source** to the logical subject or actor of the relationship.  
    - The **target** should represent the object, complement, or entity affected by the action or description.
 
 3. **Standardized Naming**:  
-   - Use lowercase, underscore-separated terms for relationships (e.g., `works_at`, `studied_at`, `is_known_as`).
+   - Relationships must be formatted in lowercase, using **underscore-separated terms** (e.g., `works_at`, `created`, `has_moved_to`, `invented`).
 
 4. **USER_ID as Priority**:  
    - When **USER_ID** is mentioned, prioritize it as the **source** for all relevant relationships.  
@@ -232,7 +233,8 @@ EXTRACT_ENTITIES_PROMPT = f"""\
    - Break the input into logical segments if multiple ideas are present. Extract key entities and relationships from each segment.
 
 2. **Determine Source and Target**:  
-   - Dynamically identify the **source** based on the subject of the segment. Assign the **target** based on the complement or object of the relationship.
+   - Dynamically identify the **source** based on the subject of the segment. Assign the **target** based on the complement or object of the relationship.  
+   - Format **nodes** in lowercase unless they are proper nouns or specific terms.
 
 3. **Standardize and Validate**:  
    - Ensure all relationships follow standardized naming conventions and maintain logical directionality.
@@ -242,14 +244,15 @@ EXTRACT_ENTITIES_PROMPT = f"""\
 
 **Generalized Guidance for Outputs**
 
-- When multiple ideas are present, extract each relationship independently. Ensure logical connections and avoid overlap or ambiguity.
-- For user-referential input (e.g., "I graduated from MIT in 2020"), use **USER_ID** as the **source**.
-- For third-party statements, dynamically determine the **source** based on the subject of the statement.
+- All **nodes** and **relationships** should be written in **English**, with lowercase formatting for nodes (except proper nouns) and lowercase with underscores for relationships.  
+- For user-referential input (e.g., "I graduated from MIT in 2020"), use **USER_ID** as the **source**.  
+- For third-party statements, dynamically determine the **source** based on the logical subject of the statement.  
 
 **Examples of Logical Behavior**
 
-**Input 1 (USER_ID-centric)**:
-"I work as a Principal Engineer at Google and graduated from Stanford in 2015."  
+**Input 1 (USER_ID-centric)**:  
+*"I work as a Principal Engineer at Google and graduated from Stanford in 2015."*  
+
 **Output**:  
 ```json
 [
@@ -276,8 +279,9 @@ EXTRACT_ENTITIES_PROMPT = f"""\
 ]
 ```
 
-**Input 2 (Third-party relationships)**:
-"Tesla was founded by Elon Musk and started in 2003."  
+**Input 2 (Third-party relationships)**:  
+*"Tesla được Elon Musk thành lập và đi vào hoạt động vào năm 2003."*  
+
 **Output**:  
 ```json
 [
@@ -294,8 +298,9 @@ EXTRACT_ENTITIES_PROMPT = f"""\
 ]
 ```
 
-**Input 3 (Mixed and Complex Ideas)**:
-"My name's Lâm Hiếu, also known as Hiểu Lầm, enjoys hiking. I currently works at Sendo as a Principal Engineer."  
+**Input 3 (Mixed, Complex Ideas)**:  
+*"Tôi tên là Lâm Hiếu, còn được gọi là Hiểu Lầm, thích đi bộ đường dài. Hiện tại tôi đang làm việc tại Sendo với vai trò là Kỹ sư chính. Tôi thích sử dụng biệt danh khi giao tiếp"*  
+
 **Output**:  
 ```json
 [
@@ -324,10 +329,13 @@ EXTRACT_ENTITIES_PROMPT = f"""\
     "relationship": "job_title",
     "target": "Principal Engineer"
   }}
+  {{
+    "source": "USER_ID",
+    "relationship": "has_preference",
+    "target": "using nicknames in communication"
+  }}
 ]
 ```
-
-This ensures that **English compliance** is maintained across outputs, prioritizing clarity, accuracy, and consistency.
 """
 
 
@@ -353,12 +361,16 @@ def get_update_memory_messages(existing_memories, memory):
 
 
 def sanitize_graph_item(item):
-    def transform(value):
-        # return value.lower().replace(" ", "_") if value else value
-        return convert_unicode_escapes(value)
+    def transform(key, value):
+        value = convert_unicode_escapes(value)
+        return (
+            value.lower().replace(" ", "_")
+            if key in ["source_type", "destination_type"]
+            else value
+        )
 
     keys = ["source", "source_type", "relationship", "destination", "destination_type"]
-    return {key: transform(item[key]) for key in keys if key in item}
+    return {key: transform(key, item[key]) for key in keys if key in item}
 
 
 def convert_unicode_escapes(content):
