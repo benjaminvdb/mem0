@@ -146,14 +146,17 @@ class Memory(MemoryBase):
             user_prompt = f"{parsed_messages}"
         else:
             system_prompt, user_prompt = get_fact_retrieval_messages(parsed_messages)
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
 
+        logger.info("The facts extract with the following messages: %s", messages)
         response = self.llm.generate_response(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            response_format={"type": "json_object"},
+            messages=messages,
+            # response_format={"type": "json_object"},
         )
+        logger.info("The facts extract response: %s", response)
 
         try:
             response = remove_code_blocks(response)

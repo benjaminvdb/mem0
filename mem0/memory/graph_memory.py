@@ -139,9 +139,8 @@ class MemoryGraph:
             # and causes the error: "should be non-empty for OBJECT type"
             _tools = [UPDATE_MEMORY_TOOL_GRAPH, ADD_MEMORY_TOOL_GRAPH]
 
-        print(
-            "update_memory_promptupdate_memory_prompt",
-            json.dumps(update_memory_prompt, ensure_ascii=False, indent=2),
+        logger.debug(
+            "The extracted entities update memory prompt is: %s", update_memory_prompt
         )
 
         memory_updates = self.llm.generate_response(
