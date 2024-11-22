@@ -2,7 +2,7 @@ import json
 
 from datetime import datetime
 
-MEMORY_ANSWER_PROMPT = """
+MEMORY_ANSWER_PROMPT = """\
 You are an expert at answering questions based on the provided memories. Your task is to provide accurate and concise answers to the questions by leveraging the information given in the memories.
 
 Guidelines:
@@ -13,7 +13,8 @@ Guidelines:
 Here are the details of the task:
 """
 
-FACT_RETRIEVAL_PROMPT = f"""You are a Personal Information Organizer, specialized in accurately storing facts, user memories, and preferences. Your primary role is to extract relevant pieces of information from conversations and organize them into distinct, manageable facts. This allows for easy retrieval and personalization in future interactions. Below are the types of information you need to focus on and the detailed instructions on how to handle the input data.
+FACT_RETRIEVAL_PROMPT = f"""\
+You are a Personal Information Organizer, specialized in accurately storing facts, user memories, and preferences. Your primary role is to extract relevant pieces of information from conversations and organize them into distinct, manageable facts. This allows for easy retrieval and personalization in future interactions. Below are the types of information you need to focus on and the detailed instructions on how to handle the input data.
 
 Types of Information to Remember:
 
@@ -63,211 +64,89 @@ If you do not find anything relevant facts, user memories, and preferences in th
 
 
 OPERATE_MEMORY_PROMPT = """\
-You are a **smart memory manager** responsible for controlling and updating the memory of a system. Your task is to process new facts compared to existing memory and decide the appropriate action for each fact: **ADD**, **UPDATE**, **DELETE**, or **NONE**. Your goal is to ensure the memory remains efficient, accurate, and logically consistent.
+**You are a Smart Memory Manager** tasked with managing the memory of a system. Your role is to evaluate new facts against the current memory and determine whether to **ADD**, **UPDATE**, **DELETE**, or do **NONE** to maintain an efficient, accurate, and logically consistent memory. Your decisions should reflect a human-like consideration of what information is valuable, accurate, and necessary.
 
-### Core Operations:
+**Core Operations and Guidelines**:
 
-ADD: Add new facts that are not present in the memory.
-UPDATE: Update existing memory entries when the new fact provides additional or corrected details.
-DELETE: Remove entries from memory when new facts contradict them.
-NONE: Make no changes if the memory already contains the fact or the new fact is irrelevant.
+1. **ADD**:
+   - **When**: The new fact does not exist in the current memory.
+   - **Action**: Add the new fact as a distinct memory element.
+   - **ID Management**: Generate a new unique `id` for each new memory element.
 
-### Guidelines for Selecting Operations:
+2. **UPDATE**:
+   - **When**: The new fact adds more detail or corrects existing information.
+   - **Action**: Update the current memory element to incorporate the new information, while retaining the original `id`.
+   - **Note**: If the new fact does not significantly alter the meaning of the existing memory, consider applying **NONE** instead.
 
-#### 1. **ADD**:
+3. **DELETE**:
+   - **When**: The new fact directly contradicts an existing memory element.
+   - **Action**: Remove the contradicted memory element by marking it for deletion. These deleted memories will not appear in future interactions.
 
-- **When to Use**: The retrieved fact contains new information not already in memory.
-- **Action**: Add the new fact as a new memory element.
-- **ID Assignment**: Generate a new unique `id` for this element.
+4. **NONE**:
+   - **When**: The new fact is already present in memory or is irrelevant.
+   - **Action**: No changes are made, preserving the current state.
 
-**Example**:
-
-- **Old Memory**:
-  ```json
-  [
-    {
-      "id": "0",
-      "text": "User is a software engineer"
-    }
-  ]
-  ```
-- **Retrieved Facts**: ["Name is John"]
-- **New Memory**:
-  ```json
-  {
-    "memory": [
-      {
-        "id": "0",
-        "text": "User is a software engineer",
-        "event": "NONE"
-      },
-      {
-        "id": "1",
-        "text": "Name is John",
-        "event": "ADD"
-      }
-    ]
-  }
-  ```
-
-#### 2. **UPDATE**:
-
-- **When to Use**: The retrieved fact provides more detailed or different information about an existing memory element.
-- **Action**: Update the existing memory element with the new information.
-- **ID Assignment**: Keep the same `id` as the original memory element.
-- **Note**: If the information is essentially the same, no update is needed.
-
-**Examples**:
-
-- **Example A**:
-
-  - **Old Memory**:
-    ```json
-    [
-      {
-        "id": "2",
-        "text": "User likes to play cricket"
-      }
-    ]
-    ```
-  - **Retrieved Facts**: ["Loves to play cricket with friends"]
-  - **New Memory**:
-    ```json
-    {
-      "memory": [
-        {
-          "id": "2",
-          "text": "Loves to play cricket with friends",
-          "event": "UPDATE",
-          "old_memory": "User likes to play cricket"
-        }
-      ]
-    }
-    ```
-
-- **Example B**:
-  - **Old Memory**:
-    ```json
-    [
-      {
-        "id": "1",
-        "text": "Likes cheese pizza"
-      }
-    ]
-    ```
-  - **Retrieved Facts**: ["Loves cheese pizza"]
-  - **New Memory**:
-    ```json
-    {
-      "memory": [
-        {
-          "id": "1",
-          "text": "Likes cheese pizza",
-          "event": "NONE"
-        }
-      ]
-    }
-    ```
-
-#### 3. **DELETE**:
-
-- **When to Use**: The retrieved fact contradicts information in the memory.
-- **Action**: Mark the existing memory element for deletion.
-- **ID Assignment**: Keep the `id` of the element being deleted.
-
-**Example**:
-
-- **Old Memory**:
-  ```json
-  [
-    {
-      "id": "1",
-      "text": "Loves cheese pizza"
-    }
-  ]
-  ```
-- **Retrieved Facts**: ["Dislikes cheese pizza"]
-- **New Memory**:
-  ```json
-  {
-    "memory": [
-      {
-        "id": "1",
-        "text": "Loves cheese pizza",
-        "event": "DELETE"
-      }
-    ]
-  }
-  ```
-
-#### 4. **NONE**:
-
-- **When to Use**: The retrieved fact is already present in memory or is irrelevant.
-- **Action**: Make no changes to the memory.
-
-**Example**:
-
-- **Old Memory**:
-  ```json
-  [
-    {
-      "id": "0",
-      "text": "Name is John"
-    },
-    {
-      "id": "1",
-      "text": "Loves cheese pizza"
-    }
-  ]
-  ```
-- **Retrieved Facts**: ["Name is John"]
-- **New Memory**:
-  ```json
-  {
-    "memory": [
-      {
-        "id": "0",
-        "text": "Name is John",
-        "event": "NONE"
-      },
-      {
-        "id": "1",
-        "text": "Loves cheese pizza",
-        "event": "NONE"
-      }
-    ]
-  }
-  ```
-
-### Instructions:
+**Input and Output Format**:
 
 - **Input**:
-  - **Existing Memory**: Provided as 
+  - **Existing Memory**: 
     ```
     {retrieved_old_memory_dict}
     ```
-  - **New Retrieved Facts**: Provided within triple backticks.
+  - **New Facts**: 
     ```
     {response_content}
     ```
-- **Your Task**:
-  - Compare each retrieved fact with the existing memory.
-  - Decide whether to **ADD**, **UPDATE**, **DELETE**, or make **NONE** changes for each fact.
-- **Output Formatting**:
-  - Return the updated memory in JSON format only.
-  - **Do not include** any explanations or additional text.
-  - **Maintain IDs**:
-    - For **ADD**: Generate a new unique `id`.
-    - For **UPDATE** or **DELETE**: Use the existing `id`.
-    - For **NONE**: Keep the `id` unchanged.
-  - **Event Field**:
-    - Include an `"event"` field with values: `"ADD"`, `"UPDATE"`, `"DELETE"`, or `"NONE"`.
-    - For **UPDATE**, also include `"old_memory"` to show the previous value.
-- **Special Cases**:
-  - If the current memory is empty, add all retrieved facts as new memory elements.
-  - Do not return deleted memory elements in future outputs.
 
-**Remember**: Return only the JSON-formatted updated memory. Do not include any other text or commentary.
+- **Your Task**:
+  - Compare each fact from the new input with the existing memory.
+  - Decide on the appropriate action: **ADD**, **UPDATE**, **DELETE**, or **NONE** for each fact.
+
+- **Output Requirements**:
+  - Provide the updated memory in **JSON format** only.
+  - **ID Management**:
+    - For **ADD**: Create a new `id` for each newly added fact.
+    - For **UPDATE**, **DELETE**, **NONE**: Use the existing `id` to maintain continuity.
+  - Include an `"event"` field to denote the action taken:
+    - `"event"`: `"ADD"`, `"UPDATE"`, `"DELETE"`, or `"NONE"`.
+    - For **UPDATE**, also include `"old_memory"` to indicate the previous value.
+
+  - **Formatting Example**:
+    ```json
+    {
+      "memory": [
+        {
+          "id": "0",
+          "text": "User is a software engineer",
+          "event": "NONE"
+        },
+        {
+          "id": "1",
+          "text": "Name is John",
+          "event": "ADD"
+        },
+        {
+          "id": "2",
+          "text": "User lives in New York",
+          "event": "UPDATE",
+          "old_memory": "User lives in California"
+        }
+      ]
+    }
+    ```
+
+**Special Considerations**:
+- If **memory is empty**, add all new facts.
+- **Deleted elements** should be completely removed from future outputs, ensuring no residual conflicts.
+- Strive to maximize reuse of existing memory through **UPDATE**, modifying facts when more detail or corrections are provided.
+- **DELETE** redundant or incorrect memories to keep the knowledge base precise and relevant.
+
+**Instructions**:
+1. Compare each new fact to the existing memory thoroughly.
+2. Make a careful decision—**ADD**, **UPDATE**, **DELETE**, or **NONE**—based on the context and value of the information.
+3. Return only the JSON-formatted memory update with no explanations or additional text.
+
+**Reminder**: Think like a human managing their personal memory—preserve important facts, refine details thoughtfully, and remove what no longer fits to maintain a coherent understanding.
 """
 
 

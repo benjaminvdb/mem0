@@ -1,16 +1,21 @@
 import logging
+import json
 
 from mem0.memory.utils import format_entities
 
 try:
     from langchain_community.graphs import Neo4jGraph
 except ImportError:
-    raise ImportError("langchain_community is not installed. Please install it using pip install langchain-community")
+    raise ImportError(
+        "langchain_community is not installed. Please install it using pip install langchain-community"
+    )
 
 try:
     from rank_bm25 import BM25Okapi
 except ImportError:
-    raise ImportError("rank_bm25 is not installed. Please install it using pip install rank-bm25")
+    raise ImportError(
+        "rank_bm25 is not installed. Please install it using pip install rank-bm25"
+    )
 
 from mem0.graphs.tools import (
     ADD_MEMORY_STRUCT_TOOL_GRAPH,
@@ -42,7 +47,9 @@ class MemoryGraph:
             self.config.graph_store.config.username,
             self.config.graph_store.config.password,
         )
-        self.embedding_model = EmbedderFactory.create(self.config.embedder.provider, self.config.embedder.config)
+        self.embedding_model = EmbedderFactory.create(
+            self.config.embedder.provider, self.config.embedder.config
+        )
 
         self.llm_provider = "openai_structured"
         if self.config.llm.provider:
@@ -70,7 +77,9 @@ class MemoryGraph:
             messages = [
                 {
                     "role": "system",
-                    "content": EXTRACT_ENTITIES_PROMPT.replace("USER_ID", self.user_id).replace(
+                    "content": EXTRACT_ENTITIES_PROMPT.replace(
+                        "USER_ID", self.user_id
+                    ).replace(
                         "CUSTOM_PROMPT", f"4. {self.config.graph_store.custom_prompt}"
                     ),
                 },
@@ -95,13 +104,21 @@ class MemoryGraph:
         )
 
         if extracted_entities["tool_calls"]:
-            extracted_entities = extracted_entities["tool_calls"][0]["arguments"]["entities"]
+            extracted_entities = extracted_entities["tool_calls"][0]["arguments"][
+                "entities"
+            ]
         else:
             extracted_entities = []
 
+        print(
+            "extracted_entitiesextracted_entities",
+            json.dumps(extracted_entities, ensure_ascii=False, indent=2),
+        )
         logger.debug(f"Extracted entities: {extracted_entities}")
         search_output_string = format_entities(search_output)
-        update_memory_prompt = get_update_memory_messages(search_output_string, extracted_entities)
+        update_memory_prompt = get_update_memory_messages(
+            search_output_string, extracted_entities
+        )
 
         _tools = [UPDATE_MEMORY_TOOL_GRAPH, ADD_MEMORY_TOOL_GRAPH, NOOP_TOOL]
         if self.llm_provider in ["azure_openai_structured", "openai_structured"]:
@@ -114,6 +131,11 @@ class MemoryGraph:
             # The `noop` ​​function n should be removed because it is unnecessary
             # and causes the error: "should be non-empty for OBJECT type"
             _tools = [UPDATE_MEMORY_TOOL_GRAPH, ADD_MEMORY_TOOL_GRAPH]
+
+        print(
+            "update_memory_promptupdate_memory_prompt",
+            json.dumps(update_memory_prompt, ensure_ascii=False, indent=2),
+        )
 
         memory_updates = self.llm.generate_response(
             messages=update_memory_prompt,
@@ -146,7 +168,9 @@ class MemoryGraph:
             destination = sanitized_item["destination"]
             destination_type = sanitized_item["destination_type"]
 
-            returned_entities.append({"source": source, "relationship": relation, "target": destination})
+            returned_entities.append(
+                {"source": source, "relationship": relation, "target": destination}
+            )
 
             # Create embeddings
             source_embedding = self.embedding_model.embed(source)
@@ -267,7 +291,10 @@ class MemoryGraph:
         if not search_output:
             return []
 
-        search_outputs_sequence = [[item["source"], item["relation"], item["destination"]] for item in search_output]
+        search_outputs_sequence = [
+            [item["source"], item["relation"], item["destination"]]
+            for item in search_output
+        ]
         bm25 = BM25Okapi(search_outputs_sequence)
 
         tokenized_query = query.split(" ")
@@ -275,7 +302,9 @@ class MemoryGraph:
 
         search_results = []
         for item in reranked_results:
-            search_results.append({"source": item[0], "relationship": item[1], "target": item[2]})
+            search_results.append(
+                {"source": item[0], "relationship": item[1], "target": item[2]}
+            )
 
         logger.info(f"Returned {len(search_results)} search results")
 
@@ -308,7 +337,9 @@ class MemoryGraph:
         RETURN n.name AS source, type(r) AS relationship, m.name AS target
         LIMIT $limit
         """
-        results = self.graph.query(query, params={"user_id": filters["user_id"], "limit": limit})
+        results = self.graph.query(
+            query, params={"user_id": filters["user_id"], "limit": limit}
+        )
 
         final_results = []
         for result in results:
@@ -373,4 +404,6 @@ class MemoryGraph:
         )
 
         if not result:
-            raise Exception(f"Failed to update or create relationship between {source} and {target}")
+            raise Exception(
+                f"Failed to update or create relationship between {source} and {target}"
+            )

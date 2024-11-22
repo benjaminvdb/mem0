@@ -143,7 +143,7 @@ class Memory(MemoryBase):
 
         if self.custom_prompt:
             system_prompt = self.custom_prompt
-            user_prompt = f"Input: {parsed_messages}"
+            user_prompt = f"{parsed_messages}"
         else:
             system_prompt, user_prompt = get_fact_retrieval_messages(parsed_messages)
 
@@ -189,9 +189,12 @@ class Memory(MemoryBase):
             messages=[{"role": "user", "content": function_calling_prompt}],
             response_format={"type": "json_object"},
         )
-
-        new_memories_with_actions = remove_code_blocks(new_memories_with_actions)
-        new_memories_with_actions = json.loads(new_memories_with_actions)
+        try:
+            new_memories_with_actions = remove_code_blocks(new_memories_with_actions)
+            new_memories_with_actions = json.loads(new_memories_with_actions)
+        except Exception as e:
+            logging.error("Caught an exception while parsing new_memories_with_actions: %s, error: %s", new_memories_with_actions, e)
+            new_memories_with_actions = {"memory": []}
 
         returned_memories = []
         try:
