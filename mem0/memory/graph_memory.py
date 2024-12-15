@@ -1,6 +1,7 @@
 import logging
 import json
 
+from datetime import datetime
 from mem0.memory.utils import format_entities
 
 try:
@@ -91,7 +92,9 @@ class MemoryGraph:
             messages = [
                 {
                     "role": "system",
-                    "content": EXTRACT_ENTITIES_PROMPT.replace("USER_ID", self.user_id),
+                    "content": EXTRACT_ENTITIES_PROMPT.replace(
+                        "USER_ID", self.user_id
+                    ).replace("{now}", datetime.now().strftime("%Y-%m-%d")),
                 },
                 {"role": "user", "content": data},
             ]

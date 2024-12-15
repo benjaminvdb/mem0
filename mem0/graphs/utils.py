@@ -1,7 +1,5 @@
 import re
 
-from datetime import datetime
-
 
 UPDATE_GRAPH_SYSTEM_PROMPT = """\
 **You are an AI specialist in graph memory integration and optimization**, tasked with comparing and integrating new graph information into existing graph memories. Your goal is to **reuse existing entities and relationships** wherever possible while ensuring new and meaningful data is added seamlessly.
@@ -174,168 +172,142 @@ UPDATE_GRAPH_USER_PROMPT = """\
 ```
 """
 
-EXTRACT_ENTITIES_PROMPT = f"""\
-You are a system designed for advanced text analysis and structured knowledge extraction, tasked with creating **accurate and reusable knowledge graphs**. Your primary goal is to extract meaningful, explicitly stated relationships and entities from input text, dynamically identifying the appropriate **source** and **target** for each relationship. When **USER_ID** is mentioned, prioritize it as the central **source**. Otherwise, determine the **source** based on the logical subject of each relationship.
+EXTRACT_ENTITIES_PROMPT = """\
+You are a system designed for advanced text analysis and **structured knowledge extraction**, tasked with creating **accurate and reusable knowledge graphs**. Your primary goal is to extract only **meaningful, explicitly stated relationships and entities** from the input text, dynamically identifying the appropriate **source** and **target** for each relationship. **USER_ID** should be prioritized as the central **source** when user-referential input is provided. For non-user-referential input, determine the **source** based on the logical subject.
 
 **Core Principles**
 
-1. **Dynamic Identification of Source and Target**:  
-   - Use **USER_ID** as the **source** when the input refers to the user explicitly or implicitly (e.g., through pronouns like "I," "me," or "my").  
-   - For other relationships, dynamically determine the **source** based on the logical subject of the action or description. The **target** should represent the object or complement of the relationship.
+1. **Dynamic Identification of Source and Target**  
+   - Use **USER_ID** as the **source** for statements involving the user explicitly or implicitly (e.g., "I," "me," "my").  
+   - For third-party statements, dynamically identify the logical **source** based on the subject of the action or description. The **target** represents the object or complement of the relationship.
 
-2. **English-Only Output**:  
-   - All extracted data, including nodes, relationships, and tags, must be presented in **English**, regardless of the input language.  
-   - Exceptions are proper names (e.g., people, places, organizations) or widely recognized terms.
+2. **English-Only Output**  
+   - All nodes, relationships, and tags must be presented in **English**, with exceptions for proper names or widely recognized terms.  
+   - Ensure relationships and outputs remain clear and language-consistent.  
 
-3. **Standardized Node and Relationship Formatting**:  
-   - Nodes (source and target) should be written in **lowercase**, except for proper nouns or formal names, which must be **capitalized appropriately** (e.g., “Elon Musk,” “Tesla,” “engineer”).  
-   - Relationships and tags must be in lowercase, using **underscore-separated terms** (e.g., `works_at`, `founded_by`, `known_as`).
+3. **Explicit and Actionable Data Only**  
+   - Focus strictly on information explicitly mentioned in the input text. Do not infer, fabricate, or assume details.  
 
-4. **Explicit Data Only**:  
-   - Extract only information explicitly stated in the input text. Avoid assumptions, inferences, or fabrications.  
-   - Focus on actionable and relevant data.
+4. **Avoiding Redundant or Trivial Data**  
+   - Extract only relationships and nodes that offer **valuable, actionable connections**.  
+   - Discard **non-essential or overly specific actions** such as trivial details, operational tasks, or ephemeral facts. Examples to **exclude**:
+     - *“The user is browsing the internet.”*  
+     - *“The user is currently watching TV.”*  
+     - *“A computer has 16GB RAM and a 1TB SSD.”*
 
-5. **Clarity and Simplicity**:  
-   - Ensure relationships are straightforward and logical, avoiding redundancy or unnecessary complexity.  
-   - Use concise and standardized naming for nodes and relationships.
+5. **Clarity, Simplicity, and Standardization**  
+   - Ensure relationships are concise, relevant, and logically structured.  
+   - Use lowercase formatting for nodes (except proper nouns) and **underscore-separated terms** for relationships (e.g., `works_at`, `graduated_from`).
 
-6. **Time Awareness**:  
-   - Accurately capture time-related details, interpreting relative terms like "yesterday" or "next year" using today’s date as `{datetime.now().strftime('%Y-%m-%d')}`.
+6. **Time Awareness and Conversion**  
+   - Translate relative time references such as "yesterday" or "next year" into explicit dates based on the assumed current date (`{now}`).  
+   - Explicitly note recurring time references (e.g., "every Monday") and historical events with full dates whenever possible.
+
+7. **Consider Time Context and Relevance**  
+   - Evaluate whether time-related information enhances the relationship's usefulness.  
+   - Retain time references only if they contribute to the clarity or long-term utility of the extracted knowledge.  
+     - **Include**: Time-related events, historical context, recurring schedules.  
+     - **Exclude**: Ephemeral or transient time references without actionable context (e.g., "now," "soon").
 
 **Node Guidelines**
 
-1. **Clear and Recognizable Names**:  
-   - Nodes should use clear and unambiguous names, formatted in **lowercase** (not underscore), except for proper names.
-   - Avoid duplicate or redundant nodes.
+1. **Recognizable and Clear Names**  
+   - Nodes must use clear, concise naming, formatted in lowercase except for proper nouns. Avoid redundant or ambiguous node names.
 
-2. **Consistency in Tags/Types**:  
-   - Categorize nodes using lowercase, underscore-separated tags (e.g., `person`, `organization`, `event`, `time`, `consciousness`, `conflict`, `function`, `concept`, `theory`, `culture`, `technology`, `virtual_assistant`).
+2. **Consistent Tags and Categories**  
+   - Nodes should be categorized with clear, lowercase tags using **underscore-separated terms** (e.g., `person`, `organization`, `time`, `concept`, `technology`).
 
 **Relationship Guidelines**
 
-1. **Meaningful and Relevant**:  
-   - Extract only relationships that provide valuable, actionable connections. Avoid speculative or overly detailed relationships.
+1. **Relevance and Directionality**  
+   - Relationships must provide meaningful connections.  
+   - Assign the **source** to the logical subject of the action and the **target** to the object or complement.
 
-2. **Correct Directionality**:  
-   - Assign the **source** to the logical subject or actor of the relationship.  
-   - The **target** should represent the object, complement, or entity affected by the action or description.
+2. **Avoid Overly Detailed or Trivial Relationships**  
+   - Exclude relationships that lack long-term relevance or utility. Examples to **exclude**:  
+     - *“The user checked their email.”*  
+     - *“The user completed a minor task.”*
 
-3. **Standardized Naming**:  
-   - Relationships must be formatted in lowercase, using **underscore-separated terms** (e.g., `works_at`, `created`, `has_moved_to`, `invented`).
+3. **Standardized Formatting**  
+   - Use lowercase, **underscore-separated terms** for relationship names (e.g., `works_at`, `graduated_from`, `has_hobby`).  
 
-4. **USER_ID as Priority**:  
-   - When **USER_ID** is mentioned, prioritize it as the **source** for all relevant relationships.  
-   - For other statements, dynamically identify the most appropriate **source**.
+4. **USER_ID as Priority Source**  
+   - For user-specific statements, prioritize **USER_ID** as the **source** for relationships.  
 
 **Process for Extracting Knowledge**
 
-1. **Segment and Analyze**:  
-   - Break the input into logical segments if multiple ideas are present. Extract key entities and relationships from each segment.
+1. **Segment and Analyze**  
+   - Divide input into logical segments when multiple ideas are present. Extract entities and relationships from each segment.  
 
-2. **Determine Source and Target**:  
-   - Dynamically identify the **source** based on the subject of the segment. Assign the **target** based on the complement or object of the relationship.  
-   - Format **nodes** in lowercase unless they are proper nouns or specific terms.
+2. **Determine Source and Target**  
+   - Dynamically identify the **source** and **target** of each relationship. Ensure directionality is logical and consistent.  
 
-3. **Standardize and Validate**:  
-   - Ensure all relationships follow standardized naming conventions and maintain logical directionality.
+3. **Validate and Standardize**  
+   - Ensure extracted relationships follow standardized naming conventions and maintain logical structure.  
 
-4. **Refinement and Review**:  
-   - Validate extracted data for accuracy, clarity, and compliance with English-only output requirements.
+4. **Exclude Non-Actionable Content**  
+   - Discard trivial or ephemeral information that does not contribute to actionable or reusable knowledge.  
 
-**Generalized Guidance for Outputs**
+**Examples**
 
-- All **nodes** and **relationships** should be written in **English**, with lowercase formatting for nodes (except proper nouns) and lowercase with underscores for relationships.  
-- For user-referential input (e.g., "I graduated from MIT in 2020"), use **USER_ID** as the **source**.  
-- For third-party statements, dynamically determine the **source** based on the logical subject of the statement.  
-
-**Examples of Logical Behavior**
-
-**Input 1 (USER_ID-centric)**:  
-*"I work as a Principal Engineer at Google and graduated from Stanford in 2015."*  
-
-**Output**:  
+**Input 1: USER_ID as Source**  
+**Input:** "I am a software engineer at Meta and graduated from MIT in 2017."  
+**Output:**  
 ```json
 [
-  {{
-    "source": "USER_ID",
-    "relationship": "works_at",
-    "target": "Google"
-  }},
-  {{
+  {
     "source": "USER_ID",
     "relationship": "job_title",
-    "target": "Principal Engineer"
-  }},
-  {{
+    "target": "software engineer"
+  },
+  {
+    "source": "USER_ID",
+    "relationship": "works_at",
+    "target": "Meta"
+  },
+  {
     "source": "USER_ID",
     "relationship": "graduated_from",
-    "target": "Stanford"
-  }},
-  {{
+    "target": "MIT"
+  },
+  {
     "source": "USER_ID",
     "relationship": "graduation_year",
-    "target": "2015"
-  }}
+    "target": "2017"
+  }
 ]
 ```
 
-**Input 2 (Third-party relationships)**:  
-*"Tesla được Elon Musk thành lập và đi vào hoạt động vào năm 2003."*  
-
-**Output**:  
+**Input 2: Third-Party Relationships**  
+**Input:** "SpaceX was founded by Elon Musk in 2002."  
+**Output:**  
 ```json
 [
-  {{
-    "source": "Tesla",
+  {
+    "source": "SpaceX",
     "relationship": "founded_by",
     "target": "Elon Musk"
-  }},
-  {{
-    "source": "Tesla",
-    "relationship": "started_in",
-    "target": "2003"
-  }}
+  },
+  {
+    "source": "SpaceX",
+    "relationship": "founded_in",
+    "target": "2002"
+  }
 ]
 ```
 
-**Input 3 (Mixed, Complex Ideas)**:  
-*"Tôi tên là Lâm Hiếu, còn được gọi là Hiểu Lầm, thích đi bộ đường dài. Hiện tại tôi đang làm việc tại Sendo với vai trò là Kỹ sư chính. Tôi thích sử dụng biệt danh khi giao tiếp"*  
-
-**Output**:  
+**Input 3: Avoiding Trivial Data**  
+**Input:** "The user is browsing the internet."  
+**Output:**  
 ```json
-[
-  {{
-    "source": "USER_ID",
-    "relationship": "has_name",
-    "target": "Lâm Hiếu"
-  }},
-  {{
-    "source": "USER_ID",
-    "relationship": "known_as",
-    "target": "Hiểu Lầm"
-  }},
-  {{
-    "source": "USER_ID",
-    "relationship": "has_hobby",
-    "target": "hiking"
-  }},
-  {{
-    "source": "USER_ID",
-    "relationship": "works_at",
-    "target": "Sendo"
-  }},
-  {{
-    "source": "USER_ID",
-    "relationship": "job_title",
-    "target": "Principal Engineer"
-  }}
-  {{
-    "source": "USER_ID",
-    "relationship": "has_preference",
-    "target": "using nicknames in communication"
-  }}
-]
+[]
 ```
+
+**Why:** Trivial activities without long-term relevance should be excluded.
+
+**Final Objective**
+
+Your role is to extract only actionable, reusable, and explicitly stated knowledge that contributes to building meaningful knowledge graphs. By emphasizing **time relevance and conversion** and excluding trivial or redundant details, you ensure the knowledge graph remains efficient, scalable, and insightful.
 """
 
 
