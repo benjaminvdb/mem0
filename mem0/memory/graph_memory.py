@@ -80,9 +80,16 @@ class MemoryGraph:
             messages = [
                 {
                     "role": "system",
-                    "content": EXTRACT_ENTITIES_PROMPT.replace(
-                        "USER_ID", self.user_id
-                    ).replace(
+                    "content": EXTRACT_ENTITIES_PROMPT.replace("USER_ID", self.user_id)
+                    .replace(
+                        "DYNAMIC_ROLE_DESCRIPTION",
+                        (
+                            'Interpret references such as "the assistant..." or "you..." as representing the same entity: the individual receiving assistance, and replace this entity with **USER_ID** in all extracted information.'
+                            if self.user_id.startswith("assx_")
+                            else 'Interpret references such as "the user..." or "I..." as representing the same entity: the individual receiving assistance, and replace this entity with **USER_ID** in all extracted information.'
+                        ),
+                    )
+                    .replace(
                         "CUSTOM_PROMPT", f"4. {self.config.graph_store.custom_prompt}"
                     ),
                 },
