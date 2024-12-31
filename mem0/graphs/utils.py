@@ -91,7 +91,14 @@ Provide a list of deletion instructions, each specifying the relationship to be 
 """
 
 
+def get_update_memory_prompt(existing_memories, new_memories, template):
+    return template.format(
+        existing_memories=existing_memories or "[empty]", new_memories=new_memories
+    )
+
+
 def get_delete_messages(existing_memories_string, data, user_id):
-    return DELETE_RELATIONS_SYSTEM_PROMPT.replace(
-        "USER_ID", user_id
-    ), f"Here are the existing memories: {existing_memories_string} \n\n New Information: {data}"
+    return (
+        DELETE_RELATIONS_SYSTEM_PROMPT.replace("USER_ID", user_id),
+        f"Here are the existing memories: {existing_memories_string} \n\n New Information: {data}",
+    )
