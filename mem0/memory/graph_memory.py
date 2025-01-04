@@ -229,7 +229,7 @@ class MemoryGraph:
                     "content": f"List of entities: {list(entity_type_map.keys())}. \n\nText: {data}",
                 },
             ]
-        logger.info(
+        logger.debug(
             "Extracting relations from data: %s with entity type map: %s, filters: %s, messages: %s",
             data,
             entity_type_map,
@@ -245,7 +245,7 @@ class MemoryGraph:
             messages=messages,
             tools=_tools,
         )
-        logger.info("Extracting relations, LLM response: %s", extracted_entities)
+        logger.debug("Extracting relations, LLM response: %s", extracted_entities)
 
         if extracted_entities["tool_calls"]:
             extracted_entities = extracted_entities["tool_calls"][0]["arguments"][

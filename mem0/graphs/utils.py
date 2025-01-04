@@ -1,35 +1,57 @@
 UPDATE_GRAPH_PROMPT = """
-You are an AI expert specializing in graph memory management and optimization. Your task is to analyze existing graph memories alongside new information, and update the relationships in the memory list to ensure the most accurate, current, and coherent representation of knowledge.
+You are an AI expert specializing in graph memory management and optimization. Your primary task is to analyze and update graph memories by integrating new information into the existing structure. The goal is to ensure that the graph remains accurate, consistent, and semantically coherent while minimizing redundancy and unnecessary complexity.
 
-Input:
-1. Existing Graph Memories: A list of current graph memories, each containing source, target, and relationship information.
-2. New Graph Memory: Fresh information to be integrated into the existing graph structure.
+**Guidelines**  
+1. **Identification**  
+   Use the `source` and `destination` nodes as key identifiers when comparing new information with existing memories. Ensure that updates only occur when an exact or semantically close match is identified.
 
-Guidelines:
-1. Identification: Use the source and target as primary identifiers when matching existing memories with new information.
-2. Conflict Resolution:
-   - If new information contradicts an existing memory:
-     a) For matching source and target but differing content, update the relationship of the existing memory.
-     b) If the new memory provides more recent or accurate information, update the existing memory accordingly.
-3. Comprehensive Review: Thoroughly examine each existing graph memory against the new information, updating relationships as necessary. Multiple updates may be required.
-4. Consistency: Maintain a uniform and clear style across all memories. Each entry should be concise yet comprehensive.
-5. Semantic Coherence: Ensure that updates maintain or improve the overall semantic structure of the graph.
-6. Temporal Awareness: If timestamps are available, consider the recency of information when making updates.
-7. Relationship Refinement: Look for opportunities to refine relationship descriptions for greater precision or clarity.
-8. Redundancy Elimination: Identify and merge any redundant or highly similar relationships that may result from the update.
+2. **Conflict Resolution**  
+   - **Contradictory Information**:  
+     a) If the new information shares the same `source` and `destination` but presents a different relationship, update the existing memory accordingly.  
+     b) Prioritize newer or more accurate information when conflicting details arise, considering temporal data if available.
 
-Memory Format:
-source -- RELATIONSHIP -- destination
+**3. Node Categorization (`source_type` and `destination_type`)**  
+   Nodes in the graph should be categorized using a predefined set of types that balance generality and specificity. Use broad categories where possible, such as **person** (e.g., "Albert Einstein"), **place** (e.g., "Paris"), **time** (e.g., "2023"), **event** (e.g., "World War II"), or **culture** (e.g., "Renaissance").
+   When necessary, introduce slightly more specific categories to improve clarity, such as **chemical** (e.g., "H2O"), **docker_image** (e.g., "nginx:latest"), or **technical_indicator** (e.g., "Relative Strength Index (RSI)"). These levels of detail are helpful without making the graph overly complex.  
+   Avoid using excessively detailed types that fragment the graph unnecessarily. For instance, prefer **software_version** over highly specific types like **redis_version**, or **city** over something like **city_in_france**. This ensures the graph remains semantically rich, intuitive, and maintainable without over-complicating its structure.
 
-Task Details:
-======= Existing Graph Memories:=======
+4. **Reuse of Existing Nodes**  
+   Always attempt to reuse existing nodes rather than creating new ones. This reduces duplication and ensures that the graph remains compact and well-organized. Introduce new nodes only when no suitable existing nodes can fulfill the required role.
+
+5. **Relationship Refinement**  
+   Look for opportunities to refine relationships for greater clarity and precision. Avoid vague or overly generic terms, and ensure that the relationships provide clear and actionable meaning.
+
+6. **Redundancy Elimination**  
+   Identify redundant or highly similar relationships and merge them where appropriate. Ensure that all relevant information is retained while minimizing duplication.
+
+7. **Comprehensive Review**  
+   Thoroughly review each existing memory against the new information. Multiple updates may be necessary, so ensure the entire graph remains consistent after each change.
+
+8. **Formatting Requirements**  
+   - Each memory entry should be formatted as:  
+     **source** -- *RELATIONSHIP* -- **destination**  
+   - Ensure that the format remains uniform and consistent across all entries.
+
+**Data**  
+**Existing Graph Memories**  
+```plaintext  
 {existing_memories}
+```  
 
-======= New Graph Memory:=======
+**New Graph Memory**  
+```plaintext  
 {new_memories}
+```
 
-Output:
-Provide a list of update instructions, each specifying the source, target, and the new relationship to be set. Only include memories that require updates.
+**Output Instructions**  
+Provide a list of update instructions in the following format:  
+```plaintext  
+source -- NEW_RELATIONSHIP -- destination
+```
+Include only the memories that require updates. For each update, briefly explain whether it involves modification, replacement, or addition of a new relationship and provide a brief reason for the change.
+
+**Final Notes**  
+When integrating new information, prioritize consistency in node categorization by using broad, reusable types such as `organization`, `person`, and `version`. Avoid introducing overly specific types unless essential to distinguish the node meaningfully. Reuse existing nodes wherever possible to reduce complexity and maintain graph coherence. Ensure that updates improve the clarity and precision of relationships, keeping the graph concise, well-organized, and free from redundancy. Always aim for a balance between comprehensiveness and simplicity to create an optimized and semantically rich graph memory.
 """
 
 EXTRACT_RELATIONS_PROMPT = """
@@ -102,3 +124,14 @@ def get_delete_messages(existing_memories_string, data, user_id):
         DELETE_RELATIONS_SYSTEM_PROMPT.replace("USER_ID", user_id),
         f"Here are the existing memories: {existing_memories_string} \n\n New Information: {data}",
     )
+
+
+def get_update_memory_messages(existing_memories, new_memories):
+    return [
+        {
+            "role": "user",
+            "content": get_update_memory_prompt(
+                existing_memories, new_memories, UPDATE_GRAPH_PROMPT
+            ),
+        },
+    ]
