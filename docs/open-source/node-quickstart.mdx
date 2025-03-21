@@ -56,7 +56,10 @@ const memory = new Memory({
         model: 'gpt-4-turbo-preview',
       },
     },
-    historyDbPath: 'memory.db',
+    historyDb: {
+      dbType: 'sqlite',
+      dbUrl: 'memory.db',
+    },
   });
 ```
   </Tab>
@@ -347,7 +350,7 @@ Mem0 offers extensive configuration options to customize its behavior according 
 <Accordion title="General Configuration">
 | Parameter         | Description                          | Default                    |
 |------------------|--------------------------------------|----------------------------|
-| `historyDbPath` | Path to the history database         | "{mem0_dir}/history.db"    |
+| `historyDb` | Configure history database         | "{'dbType': 'sqlite', dbUrl: `${mem0_dir}/history.db`}"    |
 | `version`         | API version                          | "v1.0"                     |
 | `customPrompt`   | Custom prompt for memory processing  | None                       |
 </Accordion>
@@ -377,7 +380,10 @@ const config = {
           model: 'gpt-4-turbo-preview',
         },
       },
-      historyDbPath: 'memory.db',
+      historyDb: {
+        dbType: 'sqlite',
+        dbUrl: 'memory.db',
+      },
       customPrompt: "I'm a virtual assistant. I'm here to help you with your queries.",
     }
 ```

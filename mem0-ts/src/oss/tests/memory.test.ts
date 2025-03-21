@@ -1,5 +1,5 @@
 /// <reference types="jest" />
-import { Memory } from "../src";
+import { DatabaseType, Memory } from "../src";
 import { MemoryItem, SearchResult } from "../src/types";
 import dotenv from "dotenv";
 
@@ -38,7 +38,10 @@ describe("Memory Class", () => {
           model: "gpt-4-turbo-preview",
         },
       },
-      historyDbPath: ":memory:", // Use in-memory SQLite for tests
+      historyDb: {
+        dbType: DatabaseType.SQLITE,
+        dbUrl: ":memory:", // Use in-memory SQLite for tests
+      },
     });
     // Reset all memories before each test
     await memory.reset();
@@ -217,7 +220,10 @@ describe("Memory Class", () => {
             model: "gpt-4-turbo-preview",
           },
         },
-        historyDbPath: ":memory:", // Use in-memory SQLite for tests
+        historyDb: {
+          dbType: DatabaseType.SQLITE,
+          dbUrl: ":memory:", // Use in-memory SQLite for tests
+        },
       });
     });
 

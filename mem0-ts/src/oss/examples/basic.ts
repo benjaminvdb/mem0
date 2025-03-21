@@ -1,4 +1,4 @@
-import { Memory } from "../src";
+import { DatabaseType, Memory } from "../src";
 import dotenv from "dotenv";
 
 // Load environment variables
@@ -140,7 +140,6 @@ async function demoLocalMemory() {
         model: "llama3.1:8b",
       },
     },
-    // historyDbPath: "memory.db",
   });
 
   await runTests(memory);
@@ -172,7 +171,10 @@ async function demoMemoryStore() {
         model: "gpt-4-turbo-preview",
       },
     },
-    historyDbPath: "memory.db",
+    historyDb: {
+      dbType: DatabaseType.SQLITE,
+      dbUrl: "memory.db",
+    },
   });
 
   await runTests(memory);
@@ -211,7 +213,10 @@ async function demoPGVector() {
         model: "gpt-4-turbo-preview",
       },
     },
-    historyDbPath: "memory.db",
+    historyDb: {
+      dbType: DatabaseType.SQLITE,
+      dbUrl: "memory.db",
+    },
   });
 
   await runTests(memory);
@@ -251,7 +256,10 @@ async function demoQdrant() {
         model: "gpt-4-turbo-preview",
       },
     },
-    historyDbPath: "memory.db",
+    historyDb: {
+      dbType: DatabaseType.SQLITE,
+      dbUrl: "memory.db",
+    },
   });
 
   await runTests(memory);
@@ -286,7 +294,10 @@ async function demoRedis() {
         model: "gpt-4-turbo-preview",
       },
     },
-    historyDbPath: "memory.db",
+    historyDb: {
+      dbType: DatabaseType.SQLITE,
+      dbUrl: "memory.db",
+    },
   });
 
   await runTests(memory);
@@ -332,7 +343,10 @@ async function demoGraphMemory() {
         },
       },
     },
-    historyDbPath: "memory.db",
+    historyDb: {
+      dbType: DatabaseType.SQLITE,
+      dbUrl: "memory.db",
+    },
   });
 
   try {

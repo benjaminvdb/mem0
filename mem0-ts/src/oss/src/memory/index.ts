@@ -19,7 +19,7 @@ import {
   parseMessages,
   removeCodeBlocks,
 } from "../prompts";
-import { SQLiteManager } from "../storage";
+import { DatabaseType, SQLDatabaseManager } from "../storage";
 import { Embedder } from "../embeddings/base";
 import { LLM } from "../llms/base";
 import { VectorStore } from "../vector_stores/base";
@@ -39,7 +39,7 @@ export class Memory {
   private embedder: Embedder;
   private vectorStore: VectorStore;
   private llm: LLM;
-  private db: SQLiteManager;
+  private db: SQLDatabaseManager;
   private collectionName: string;
   private apiVersion: string;
   private graphMemory?: MemoryGraph;
@@ -62,7 +62,17 @@ export class Memory {
       this.config.llm.provider,
       this.config.llm.config,
     );
-    this.db = new SQLiteManager(this.config.historyDbPath || ":memory:");
+
+    const historyDb = this.config.historyDb || {
+      dbType: DatabaseType.SQLITE,
+      dbUrl: ":memory:",
+    };
+
+    if (!historyDb.dbType || !historyDb.dbUrl) {
+      throw new Error("History database configuration is required!");
+    }
+
+    this.db = new SQLDatabaseManager(historyDb.dbType, historyDb.dbUrl);
     this.collectionName = this.config.vectorStore.config.collectionName;
     this.apiVersion = this.config.version || "v1.0";
     this.enableGraph = this.config.enableGraph || false;
@@ -542,3 +552,5 @@ export class Memory {
     return memoryId;
   }
 }
+
+export { DatabaseType, SQLDatabaseManager };

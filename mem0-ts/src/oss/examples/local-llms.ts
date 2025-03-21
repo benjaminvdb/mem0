@@ -1,4 +1,4 @@
-import { Memory } from "../src";
+import { DatabaseType, Memory } from "../src";
 import { Ollama } from "ollama";
 import * as readline from "readline";
 
@@ -22,7 +22,10 @@ const memory = new Memory({
       model: "llama3.1:8b",
     },
   },
-  historyDbPath: "local-llms.db",
+  historyDb: {
+    dbType: DatabaseType.SQLITE,
+    dbUrl: "local-llms.db",
+  },
 });
 
 async function chatWithMemories(message: string, userId = "default_user") {

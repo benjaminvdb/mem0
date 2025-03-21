@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DatabaseType } from "../storage";
 
 export interface MultiModalMessages {
   type: "image_url";
@@ -58,7 +59,10 @@ export interface MemoryConfig {
     provider: string;
     config: LLMConfig;
   };
-  historyDbPath?: string;
+  historyDb?: {
+    dbType: DatabaseType;
+    dbUrl: string;
+  };
   customPrompt?: string;
   graphStore?: GraphStoreConfig;
   enableGraph?: boolean;
@@ -117,7 +121,16 @@ export const MemoryConfigSchema = z.object({
       model: z.string().optional(),
     }),
   }),
-  historyDbPath: z.string().optional(),
+  historyDb: z
+    .object({
+      dbType: z.enum([
+        DatabaseType.SQLITE,
+        DatabaseType.POSTGRESQL,
+        DatabaseType.MYSQL,
+      ]),
+      dbUrl: z.string(),
+    })
+    .optional(),
   customPrompt: z.string().optional(),
   enableGraph: z.boolean().optional(),
   graphStore: z

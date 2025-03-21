@@ -1,3 +1,4 @@
+import { DatabaseType } from "../storage";
 import { MemoryConfig } from "../types";
 
 export const DEFAULT_MEMORY_CONFIG: MemoryConfig = {
@@ -38,5 +39,8 @@ export const DEFAULT_MEMORY_CONFIG: MemoryConfig = {
       },
     },
   },
-  historyDbPath: "memory.db",
+  historyDb: {
+    dbType: DatabaseType.SQLITE,
+    dbUrl: "memory.db",
+  },
 };
