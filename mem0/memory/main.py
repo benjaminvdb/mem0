@@ -14,7 +14,7 @@ from mem0.configs.base import MemoryConfig, MemoryItem
 from mem0.configs.prompts import get_update_memory_messages
 from mem0.memory.base import MemoryBase
 from mem0.memory.setup import setup_config
-from mem0.memory.storage import SQLiteManager
+from mem0.memory.storage import SQLDatabaseManager
 from mem0.memory.telemetry import capture_event
 from mem0.memory.utils import (
     get_fact_retrieval_messages,
@@ -41,7 +41,10 @@ class Memory(MemoryBase):
             self.config.vector_store.provider, self.config.vector_store.config
         )
         self.llm = LlmFactory.create(self.config.llm.provider, self.config.llm.config)
-        self.db = SQLiteManager(self.config.history_db_path)
+        self.db = SQLDatabaseManager(
+            db_type=self.config.history_db.db_type,
+            db_url=self.config.history_db.db_url
+        )
         self.collection_name = self.config.vector_store.config.collection_name
         self.api_version = self.config.version
 
@@ -77,7 +80,6 @@ class Memory(MemoryBase):
         except ValidationError as e:
             logger.error(f"Configuration validation error: {e}")
             raise
-        
 
     def add(
         self,
