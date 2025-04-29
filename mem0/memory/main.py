@@ -1,10 +1,10 @@
-import os
 import asyncio
 import concurrent
 import gc
 import hashlib
 import json
 import logging
+import os
 import uuid
 import warnings
 from datetime import datetime
@@ -20,7 +20,7 @@ from mem0.configs.prompts import (
     get_update_memory_messages,
 )
 from mem0.memory.base import MemoryBase
-from mem0.memory.setup import setup_config, mem0_dir
+from mem0.memory.setup import mem0_dir, setup_config
 from mem0.memory.storage import SQLDatabaseManager
 from mem0.memory.telemetry import capture_event
 from mem0.memory.utils import (
@@ -777,7 +777,7 @@ class Memory(MemoryBase):
                 self.db.connection.execute("DROP TABLE IF EXISTS history")
                 self.db.connection.close()
 
-        self.db = SQLiteManager(self.config.history_db_path)
+        self.db = SQLDatabaseManager(self.config.history_db_path)
 
         # Create a new vector store with the same configuration
         self.vector_store = VectorStoreFactory.create(
@@ -1556,7 +1556,7 @@ class AsyncMemory(MemoryBase):
             await asyncio.to_thread(lambda: self.db.connection.execute("DROP TABLE IF EXISTS history"))
             await asyncio.to_thread(self.db.connection.close)
 
-        self.db = SQLiteManager(self.config.history_db_path)
+        self.db = SQLDatabaseManager(self.config.history_db_path)
 
         self.vector_store = VectorStoreFactory.create(
             self.config.vector_store.provider, self.config.vector_store.config
