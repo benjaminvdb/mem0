@@ -1843,11 +1843,11 @@ class AsyncMemory(MemoryBase):
         ):
             await asyncio.to_thread(self.vector_store.client.close)
 
-        if hasattr(self.db, "connection") and self.db.connection:
+        if hasattr(self.db, "close") and self.db.close:
             await asyncio.to_thread(
-                lambda: self.db.connection.execute("DROP TABLE IF EXISTS history")
+                lambda: self.db.reset()
             )
-            await asyncio.to_thread(self.db.connection.close)
+            await asyncio.to_thread(self.db.close)
 
         self.db = SQLDatabaseManager(
             type=self.config.history_db.type, url=self.config.history_db.url
