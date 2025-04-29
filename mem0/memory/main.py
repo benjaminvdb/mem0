@@ -890,9 +890,9 @@ class Memory(MemoryBase):
             self.vector_store.client.close()
 
         # Close the old connection if possible
-        if hasattr(self.db, "connection") and self.db.connection:
-            self.db.connection.execute("DROP TABLE IF EXISTS history")
-            self.db.connection.close()
+        if hasattr(self.db, "close") and self.db.close:
+            self.db.reset()
+            self.db.close()
 
         self.db = SQLDatabaseManager(
             type=self.config.history_db.type, url=self.config.history_db.url
