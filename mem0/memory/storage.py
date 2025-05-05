@@ -129,7 +129,8 @@ class SQLDatabaseManager:
 
         # Migrate and create table
         self._migrate_history_table()
-        self._create_history_table_sqlalchemy(self._get_connection())
+        with self._get_connection() as conn:
+            self._create_history_table_sqlalchemy(conn)
 
     @contextmanager
     def _get_connection(self) -> Generator[Connection, None, None]:
