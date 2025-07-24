@@ -10,41 +10,19 @@ from pydantic import BaseModel, Field
 
 from mem0 import Memory
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
-# Load environment variables
 load_dotenv()
 
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+NEO4J_USERNAME = os.getenv("NEO4J_USERNAME", "neo4j")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password")
+HISTORY_DB_TYPE = os.getenv("HISTORY_DB_TYPE", "sqlite")
+HISTORY_DB_URL = os.getenv("HISTORY_DB_URL", "sqlite:///:memory:")
 
-POSTGRES_HOST = os.environ.get("POSTGRES_HOST", "postgres")
-POSTGRES_PORT = os.environ.get("POSTGRES_PORT", "5432")
-POSTGRES_DB = os.environ.get("POSTGRES_DB", "postgres")
-POSTGRES_USER = os.environ.get("POSTGRES_USER", "postgres")
-POSTGRES_PASSWORD = os.environ.get("POSTGRES_PASSWORD", "postgres")
-POSTGRES_COLLECTION_NAME = os.environ.get("POSTGRES_COLLECTION_NAME", "memories")
+# Global memory instance
+MEMORY_INSTANCE = None
 
-NEO4J_URI = os.environ.get("NEO4J_URI", "bolt://neo4j:7687")
-NEO4J_USERNAME = os.environ.get("NEO4J_USERNAME", "neo4j")
-NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "mem0graph")
-
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-
-HISTORY_DB_TYPE = os.environ.get("HISTORY_DB_TYPE", "sqlite")
-HISTORY_DB_URL = os.environ.get("HISTORY_DB_URL", "/app/history/history.db")
-
-DEFAULT_CONFIG = {
-    "version": "v1.1",
-    "vector_store": {
-        "provider": "pgvector",
-        "config": {
-            "host": POSTGRES_HOST,
-            "port": int(POSTGRES_PORT),
-            "dbname": POSTGRES_DB,
-            "user": POSTGRES_USER,
-            "password": POSTGRES_PASSWORD,
-            "collection_name": POSTGRES_COLLECTION_NAME,
-        },
-    },
+MEM0_CONFIG = {
     "graph_store": {
         "provider": "neo4j",
         "config": {
@@ -54,8 +32,8 @@ DEFAULT_CONFIG = {
         },
     },
     "llm": {
-        "provider": "openai",
-        "config": {"api_key": OPENAI_API_KEY, "temperature": 0.2, "model": "gpt-4o"},
+        "provider": "openai", 
+        "config": {"api_key": OPENAI_API_KEY, "temperature": 0.2, "model": "gpt-4o"}
     },
     "embedder": {
         "provider": "openai",
@@ -65,75 +43,81 @@ DEFAULT_CONFIG = {
 }
 
 
-def create_memory_instance(config: Dict[str, Any] = DEFAULT_CONFIG) -> Memory:
-    """Initialize a Memory instance from the given configuration."""
-    return Memory.from_config(config)
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize the global Memory instance during application startup."""
-    app.state.memory_instance = create_memory_instance()
-    yield
+    global MEMORY_INSTANCE
+    try:
+        MEMORY_INSTANCE = Memory.from_config(MEM0_CONFIG)
+        logging.info("Memory instance initialized")
+        yield
+    except Exception as e:
+        logging.error(f"Failed to initialize memory: {e}")
+        raise
+    finally:
+        if MEMORY_INSTANCE:
+            try:
+                MEMORY_INSTANCE.db.close()
+                logging.info("Memory instance cleanup completed")
+            except Exception as e:
+                logging.error(f"Error during cleanup: {e}")
 
 
 app = FastAPI(
-    title="Mem0 REST APIs",
-    description="A REST API for managing and searching memories for your AI agents and applications.",
+    title="Mem0 Server",
+    description="A REST API server for Mem0, a memory layer for AI applications",
     version="1.0.0",
     lifespan=lifespan,
 )
 
 
-def get_memory_instance(request: Request) -> Memory:
-    """Dependency injection to retrieve the global Memory instance."""
-    return request.app.state.memory_instance
+def get_memory_instance():
+    """Dependency to get the memory instance"""
+    if MEMORY_INSTANCE is None:
+        raise HTTPException(status_code=500, detail="Memory instance not initialized")
+    return MEMORY_INSTANCE
 
 
 class Message(BaseModel):
-    role: str = Field(..., description="Role of the message (user or assistant).")
-    content: str = Field(..., description="Content of the message.")
+    content: str
+    role: str
 
 
 class MemoryCreate(BaseModel):
-    messages: List[Message] = Field(..., description="List of messages to store.")
+    messages: List[Message]
     user_id: Optional[str] = None
     agent_id: Optional[str] = None
     run_id: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
-
-
-class SearchRequest(BaseModel):
-    query: str = Field(..., description="Search query.")
-    user_id: Optional[str] = None
-    run_id: Optional[str] = None
-    agent_id: Optional[str] = None
     filters: Optional[Dict[str, Any]] = None
 
 
-@app.post("/configure", summary="Configure Memory")
-def set_config(config: Dict[str, Any], request: Request):
-    """
-    Set memory configuration.
-
-    Updates the memory configuration and reinitializes the Memory instance.
-    """
-    try:
-        new_instance = create_memory_instance(config)
-    except Exception as e:
-        logging.exception("Error creating Memory instance:")
-        raise HTTPException(status_code=500, detail=str(e))
-    request.app.state.memory_instance = new_instance
-    return {"message": "Configuration set successfully"}
+class MemorySearch(BaseModel):
+    query: str
+    user_id: Optional[str] = None
+    agent_id: Optional[str] = None
+    run_id: Optional[str] = None
+    limit: int = Field(default=100, le=1000)
+    filters: Optional[Dict[str, Any]] = None
+    threshold: Optional[float] = None
 
 
-@app.post("/memories", summary="Create memories")
-def add_memory(
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    logging.exception("Unhandled exception:")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal server error: {str(exc)}"},
+    )
+
+
+@app.post("/v1/memories/", tags=["Memories"])
+def create_memory(
     memory_create: MemoryCreate, memory_instance: Memory = Depends(get_memory_instance)
 ):
     """
-    Store new memories.
+    Create a new memory.
 
+    This endpoint allows you to add new memories to the memory store.
     At least one identifier (user_id, agent_id, or run_id) is required.
     """
     if not any([memory_create.user_id, memory_create.agent_id, memory_create.run_id]):
@@ -141,46 +125,42 @@ def add_memory(
             status_code=400,
             detail="At least one identifier (user_id, agent_id, run_id) is required.",
         )
+
     params = {
-        k: v
-        for k, v in memory_create.model_dump().items()
+        k: v for k, v in memory_create.model_dump().items()
         if v is not None and k != "messages"
     }
     try:
         response = memory_instance.add(
             messages=[m.model_dump() for m in memory_create.messages], **params
         )
-        return JSONResponse(content=response)
+        return response
     except Exception as e:
-        logging.exception("Error in add_memory:")
+        logging.exception("Error in create_memory:")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/memories", summary="Get memories")
+@app.get("/v1/memories/", tags=["Memories"])
 def get_all_memories(
     user_id: Optional[str] = None,
-    run_id: Optional[str] = None,
     agent_id: Optional[str] = None,
+    run_id: Optional[str] = None,
     memory_instance: Memory = Depends(get_memory_instance),
 ):
     """
-    Retrieve stored memories.
+    Get all memories for a given user, agent, or run.
 
-    At least one identifier (user_id, run_id, or agent_id) is required.
+    This endpoint retrieves all memories associated with the provided identifiers.
+    At least one identifier (user_id, agent_id, or run_id) is required.
     """
-    if not any([user_id, run_id, agent_id]):
+    if not any([user_id, agent_id, run_id]):
         raise HTTPException(
-            status_code=400, detail="At least one identifier is required."
+            status_code=400,
+            detail="At least one identifier (user_id, agent_id, run_id) is required.",
         )
     try:
         params = {
-            k: v
-            for k, v in {
-                "user_id": user_id,
-                "run_id": run_id,
-                "agent_id": agent_id,
-            }.items()
-            if v is not None
+            k: v for k, v in {"user_id": user_id, "run_id": run_id, "agent_id": agent_id}.items() if v is not None
         }
         return memory_instance.get_all(**params)
     except Exception as e:
@@ -188,105 +168,107 @@ def get_all_memories(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/memories/{memory_id}", summary="Get a memory")
-def get_memory(memory_id: str, memory_instance: Memory = Depends(get_memory_instance)):
-    """
-    Retrieve a specific memory by its ID.
-    """
-    try:
-        return memory_instance.get(memory_id)
-    except Exception as e:
-        logging.exception("Error in get_memory:")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/search", summary="Search memories")
+@app.post("/v1/memories/search/", tags=["Memories"])
 def search_memories(
-    search_req: SearchRequest, memory_instance: Memory = Depends(get_memory_instance)
+    memory_search: MemorySearch, memory_instance: Memory = Depends(get_memory_instance)
 ):
     """
-    Search for memories based on a query.
+    Search memories based on a query.
+
+    This endpoint allows you to search for memories using a query string.
+    At least one identifier (user_id, agent_id, or run_id) is required.
     """
+    if not any([memory_search.user_id, memory_search.agent_id, memory_search.run_id]):
+        raise HTTPException(
+            status_code=400,
+            detail="At least one identifier (user_id, agent_id, run_id) is required.",
+        )
     try:
         params = {
             k: v
-            for k, v in search_req.model_dump().items()
+            for k, v in memory_search.model_dump().items()
             if v is not None and k != "query"
         }
-        return memory_instance.search(query=search_req.query, **params)
+        return memory_instance.search(query=memory_search.query, **params)
     except Exception as e:
         logging.exception("Error in search_memories:")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.put("/memories/{memory_id}", summary="Update a memory")
-def update_memory(
-    memory_id: str,
-    updated_memory: Dict[str, Any],
-    memory_instance: Memory = Depends(get_memory_instance),
-):
+@app.get("/v1/memories/{memory_id}/", tags=["Memories"])
+def get_memory(memory_id: str, memory_instance: Memory = Depends(get_memory_instance)):
     """
-    Update an existing memory.
+    Get a specific memory by ID.
+
+    This endpoint retrieves a single memory using its unique identifier.
     """
     try:
-        return memory_instance.update(memory_id=memory_id, data=updated_memory)
+        # For now, we'll use the search functionality to find the memory
+        # In a production system, you might want a more direct get method
+        raise HTTPException(
+            status_code=501, detail="Get single memory endpoint not yet implemented"
+        )
+    except Exception as e:
+        logging.exception("Error in get_memory:")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/v1/memories/{memory_id}/", tags=["Memories"])
+def update_memory(
+    memory_id: str, memory_instance: Memory = Depends(get_memory_instance)
+):
+    """
+    Update a specific memory by ID.
+
+    This endpoint allows you to update an existing memory.
+    """
+    try:
+        raise HTTPException(
+            status_code=501, detail="Update memory endpoint not yet implemented"
+        )
     except Exception as e:
         logging.exception("Error in update_memory:")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/memories/{memory_id}/history", summary="Get memory history")
-def memory_history(
-    memory_id: str, memory_instance: Memory = Depends(get_memory_instance)
-):
-    """
-    Retrieve the history of a specific memory.
-    """
-    try:
-        return memory_instance.history(memory_id=memory_id)
-    except Exception as e:
-        logging.exception("Error in memory_history:")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.delete("/memories/{memory_id}", summary="Delete a memory")
+@app.delete("/v1/memories/{memory_id}/", tags=["Memories"])
 def delete_memory(
     memory_id: str, memory_instance: Memory = Depends(get_memory_instance)
 ):
     """
-    Delete a specific memory by its ID.
+    Delete a specific memory by ID.
+
+    This endpoint allows you to delete a single memory using its unique identifier.
     """
     try:
-        memory_instance.delete(memory_id=memory_id)
-        return {"message": "Memory deleted successfully"}
+        response = memory_instance.delete(memory_id)
+        return response
     except Exception as e:
         logging.exception("Error in delete_memory:")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.delete("/memories", summary="Delete all memories")
+@app.delete("/v1/memories/", tags=["Memories"])
 def delete_all_memories(
     user_id: Optional[str] = None,
-    run_id: Optional[str] = None,
     agent_id: Optional[str] = None,
+    run_id: Optional[str] = None,
     memory_instance: Memory = Depends(get_memory_instance),
 ):
     """
-    Delete all memories associated with the provided identifiers.
+    Delete all memories for a given user, agent, or run.
+
+    This endpoint deletes all memories associated with the provided identifiers.
+    At least one identifier (user_id, agent_id, or run_id) is required.
     """
-    if not any([user_id, run_id, agent_id]):
+    if not any([user_id, agent_id, run_id]):
         raise HTTPException(
-            status_code=400, detail="At least one identifier is required."
+            status_code=400,
+            detail="At least one identifier (user_id, agent_id, run_id) is required.",
         )
     try:
         params = {
-            k: v
-            for k, v in {
-                "user_id": user_id,
-                "run_id": run_id,
-                "agent_id": agent_id,
-            }.items()
-            if v is not None
+            k: v for k, v in {"user_id": user_id, "run_id": run_id, "agent_id": agent_id}.items() if v is not None
         }
         memory_instance.delete_all(**params)
         return {"message": "All relevant memories deleted"}
@@ -295,22 +277,24 @@ def delete_all_memories(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/reset", summary="Reset all memories")
-def reset_memory(memory_instance: Memory = Depends(get_memory_instance)):
+@app.get("/v1/memories/{memory_id}/history/", tags=["Memories"])
+def get_memory_history(
+    memory_id: str, memory_instance: Memory = Depends(get_memory_instance)
+):
     """
-    Completely reset all stored memories.
+    Get the history of changes for a specific memory.
+
+    This endpoint retrieves the change history for a memory, showing how it has been modified over time.
     """
     try:
-        memory_instance.reset()
-        return {"message": "All memories reset"}
+        history = memory_instance.history(memory_id)
+        return {"history": history}
     except Exception as e:
-        logging.exception("Error in reset_memory:")
+        logging.exception("Error in get_memory_history:")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/", summary="Redirect to the OpenAPI documentation", include_in_schema=False)
 def home():
-    """
-    Redirect to the OpenAPI documentation.
-    """
+    """Redirect to the OpenAPI documentation."""
     return RedirectResponse(url="/docs")

@@ -5,8 +5,7 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel
 
 try:
-    from pinecone import Pinecone, PodSpec, ServerlessSpec
-    from pinecone.data.dataclasses.vector import Vector
+    from pinecone import Pinecone, PodSpec, ServerlessSpec, Vector
 except ImportError:
     raise ImportError(
         "Pinecone requires extra dependencies. Install with `pip install pinecone pinecone-text`"
@@ -99,7 +98,7 @@ class PineconeDB(VectorStoreBase):
         existing_indexes = self.list_cols().names()
 
         if self.collection_name in existing_indexes:
-            logging.debug(f"Index {self.collection_name} already exists. Skipping creation.")
+            logger.debug(f"Index {self.collection_name} already exists. Skipping creation.")
             self.index = self.client.Index(self.collection_name)
             return
 
@@ -369,5 +368,6 @@ class PineconeDB(VectorStoreBase):
         """
         Reset the index by deleting and recreating it.
         """
+        logger.warning(f"Resetting index {self.collection_name}...")
         self.delete_col()
         self.create_col(self.embedding_model_dims, self.metric)

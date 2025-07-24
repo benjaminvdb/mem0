@@ -66,6 +66,8 @@ class Qdrant(VectorStoreBase):
             self.client = QdrantClient(**params)
 
         self.collection_name = collection_name
+        self.embedding_model_dims = embedding_model_dims
+        self.on_disk = on_disk
         self.create_col(embedding_model_dims, on_disk)
 
     def create_col(self, vector_size: int, on_disk: bool, distance: Distance = Distance.COSINE):
@@ -81,7 +83,7 @@ class Qdrant(VectorStoreBase):
         response = self.list_cols()
         for collection in response.collections:
             if collection.name == self.collection_name:
-                logging.debug(f"Collection {self.collection_name} already exists. Skipping creation.")
+                logger.debug(f"Collection {self.collection_name} already exists. Skipping creation.")
                 return
 
         self.client.create_collection(
@@ -230,3 +232,9 @@ class Qdrant(VectorStoreBase):
             with_vectors=False,
         )
         return result
+
+    def reset(self):
+        """Reset the index by deleting and recreating it."""
+        logger.warning(f"Resetting index {self.collection_name}...")
+        self.delete_col()
+        self.create_col(self.embedding_model_dims, self.on_disk)
