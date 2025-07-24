@@ -381,6 +381,67 @@ class Memory(MemoryBase):
             logger.error(f"Error adding to graph: {e}")
             return []
 
+    def get(self, memory_id):
+        """
+        Retrieve a memory by ID.
+
+        Args:
+            memory_id (str): ID of the memory to retrieve.
+
+        Returns:
+            dict: Retrieved memory.
+        """
+        capture_event("mem0.get", self, {"memory_id": memory_id, "sync_type": "sync"})
+        memory = self.vector_store.get(vector_id=memory_id)
+        if not memory:
+            return None
+
+        promoted_payload_keys = [
+            "user_id",
+            "agent_id",
+            "run_id",
+            "actor_id",
+            "role",
+        ]
+
+        core_and_promoted_keys = {"data", "hash", "created_at", "updated_at", "id", *promoted_payload_keys}
+
+        result_item = MemoryItem(
+            id=memory.id,
+            memory=memory.payload["data"],
+            hash=memory.payload.get("hash"),
+            created_at=memory.payload.get("created_at"),
+            updated_at=memory.payload.get("updated_at"),
+        ).model_dump()
+
+        for key in promoted_payload_keys:
+            if key in memory.payload:
+                result_item[key] = memory.payload[key]
+
+        additional_metadata = {k: v for k, v in memory.payload.items() if k not in core_and_promoted_keys}
+        if additional_metadata:
+            result_item["metadata"] = additional_metadata
+
+        return result_item
+
+    def update(self, memory_id, data):
+        """
+        Update a memory by ID.
+
+        Args:
+            memory_id (str): ID of the memory to update.
+            data (dict): Data to update the memory with.
+
+        Returns:
+            dict: Updated memory.
+        """
+        capture_event("mem0.update", self, {"memory_id": memory_id, "sync_type": "sync"})
+
+        existing_embeddings = {data: self.embedding_model.embed(data, "update")}
+
+        self._update_memory(memory_id, data, existing_embeddings)
+        return {"message": "Memory updated successfully!"}
+
     def get_all(
         self,
         *,
@@ -1377,6 +1438,68 @@ class AsyncMemory(MemoryBase):
         except Exception as e:
             logger.error(f"Error adding to graph: {e}")
             return []
+
+    async def get(self, memory_id):
+        """
+        Retrieve a memory by ID asynchronously.
+
+        Args:
+            memory_id (str): ID of the memory to retrieve.
+
+        Returns:
+            dict: Retrieved memory.
+        """
+        capture_event("mem0.get", self, {"memory_id": memory_id, "sync_type": "async"})
+        memory = await asyncio.to_thread(self.vector_store.get, vector_id=memory_id)
+        if not memory:
+            return None
+
+        promoted_payload_keys = [
+            "user_id",
+            "agent_id",
+            "run_id",
+            "actor_id",
+            "role",
+        ]
+
+        core_and_promoted_keys = {"data", "hash", "created_at", "updated_at", "id", *promoted_payload_keys}
+
+        result_item = MemoryItem(
+            id=memory.id,
+            memory=memory.payload["data"],
+            hash=memory.payload.get("hash"),
+            created_at=memory.payload.get("created_at"),
+            updated_at=memory.payload.get("updated_at"),
+        ).model_dump()
+
+        for key in promoted_payload_keys:
+            if key in memory.payload:
+                result_item[key] = memory.payload[key]
+
+        additional_metadata = {k: v for k, v in memory.payload.items() if k not in core_and_promoted_keys}
+        if additional_metadata:
+            result_item["metadata"] = additional_metadata
+
+        return result_item
+
+    async def update(self, memory_id, data):
+        """
+        Update a memory by ID asynchronously.
+
+        Args:
+            memory_id (str): ID of the memory to update.
+            data (dict): Data to update the memory with.
+
+        Returns:
+            dict: Updated memory.
+        """
+        capture_event("mem0.update", self, {"memory_id": memory_id, "sync_type": "async"})
+
+        embeddings = await asyncio.to_thread(self.embedding_model.embed, data, "update")
+        existing_embeddings = {data: embeddings}
+
+        await self._update_memory_async(memory_id, data, existing_embeddings)
+        return {"message": "Memory updated successfully!"}
 
     async def get_all(
         self,
