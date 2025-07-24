@@ -118,7 +118,7 @@ class Memory(MemoryBase):
     def __init__(self, config: MemoryConfig = None):
         if config is None:
             config = MemoryConfig()
-        super().__init__(config)
+        super().__init__()
 
         self.vector_store = VectorStoreFactory.create(
             config.vector_store.provider, config.vector_store.config
@@ -1159,7 +1159,7 @@ class AsyncMemory(MemoryBase):
     def __init__(self, config: MemoryConfig = None):
         if config is None:
             config = MemoryConfig()
-        super().__init__(config)
+        super().__init__()
 
         self.vector_store = VectorStoreFactory.create(
             config.vector_store.provider, config.vector_store.config
